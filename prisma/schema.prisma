@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  TEACHER
+  PARENT
+  ADMIN
+}
+
+enum FormStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum SubmissionStatus {
+  PENDING
+  SIGNED
+  DECLINED
+}
+
+enum EventType {
+  FIELD_TRIP
+  SPORTS
+  ACTIVITY
+  OTHER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  forms            PermissionForm[]    @relation("TeacherForms")
+  parentStudents   ParentStudent[]
+  formSubmissions  FormSubmission[]
+
+  @@map("users")
+}
+
+model Student {
+  id        String   @id @default(cuid())
+  name      String
+  grade     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  parents         ParentStudent[]
+  formSubmissions FormSubmission[]
+
+  @@map("students")
+}
+
+model ParentStudent {
+  parentId     String
+  studentId    String
+  relationship String
+
+  parent  User    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([parentId, studentId])
+  @@map("parent_students")
+}
+
+model PermissionForm {
+  id          String      @id @default(cuid())
+  teacherId   String      @map("teacher_id")
+  title       String
+  description String      @db.Text
+  eventDate   DateTime    @map("event_date")
+  eventType   EventType   @default(OTHER) @map("event_type")
+  deadline    DateTime
+  status      FormStatus  @default(DRAFT)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  teacher     User             @relation("TeacherForms", fields: [teacherId], references: [id], onDelete: Cascade)
+  fields      FormField[]
+  submissions FormSubmission[]
+
+  @@index([teacherId, status])
+  @@map("permission_forms")
+}
+
+model FormField {
+  id        String  @id @default(cuid())
+  formId    String  @map("form_id")
+  fieldType String  @map("field_type")
+  label     String
+  required  Boolean @default(false)
+  order     Int
+
+  // Relations
+  form      PermissionForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  responses FieldResponse[]
+
+  @@index([formId])
+  @@map("form_fields")
+}
+
+model FormSubmission {
+  id            String           @id @default(cuid())
+  formId        String           @map("form_id")
+  parentId      String           @map("parent_id")
+  studentId     String           @map("student_id")
+  signatureData String           @map("signature_data") @db.Text
+  signedAt      DateTime?        @map("signed_at")
+  ipAddress     String?          @map("ip_address")
+  status        SubmissionStatus @default(PENDING)
+
+  // Relations
+  form      PermissionForm  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  parent    User            @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student   Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  responses FieldResponse[]
+
+  @@unique([formId, parentId, studentId])
+  @@index([parentId])
+  @@index([formId, status])
+  @@map("form_submissions")
+}
+
+model FieldResponse {
+  id           String @id @default(cuid())
+  submissionId String @map("submission_id")
+  fieldId      String @map("field_id")
+  response     String @db.Text
+
+  // Relations
+  submission FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  field      FormField      @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@map("field_responses")
+}

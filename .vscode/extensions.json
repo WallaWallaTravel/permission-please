@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "prisma.prisma",
+    "ms-playwright.playwright",
+    "vitest.explorer",
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens",
+    "yoavbls.pretty-ts-errors",
+    "mikestead.dotenv",
+    "github.vscode-github-actions"
+  ],
+  "unwantedRecommendations": []
+}
