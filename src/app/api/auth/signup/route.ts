@@ -2,15 +2,22 @@ import { NextResponse } from 'next/server';
 import { hash } from 'bcrypt';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { withRateLimit, rateLimitPresets } from '@/lib/rate-limit';
 
 const signupSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z
+    .string()
+    .min(10, 'Password must be at least 10 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
   role: z.enum(['TEACHER', 'PARENT', 'ADMIN']),
 });
 
-export async function POST(request: Request) {
+async function signupHandler(request: Request) {
   try {
     const body = await request.json();
 
@@ -54,10 +61,13 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
     }
 
     console.error('Signup error:', error);
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
   }
 }
+
+// Apply rate limiting: 10 requests per minute
+export const POST = withRateLimit(signupHandler, rateLimitPresets.auth);

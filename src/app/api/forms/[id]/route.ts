@@ -1,11 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { updateFormSchema } from '@/lib/validations/form-schema';
 
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
 // GET /api/forms/[id] - Get a specific form
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
     const user = await getCurrentUser();
 
     if (!user) {
@@ -13,7 +18,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     }
 
     const form = await prisma.permissionForm.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         teacher: {
           select: {
@@ -65,8 +70,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 // PATCH /api/forms/[id] - Update a form
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
     const user = await getCurrentUser();
 
     if (!user) {
@@ -79,7 +85,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     // Check if form exists and user owns it
     const existingForm = await prisma.permissionForm.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingForm) {
@@ -95,7 +101,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     // Update form
     const form = await prisma.permissionForm.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(validatedData.title && { title: validatedData.title }),
         ...(validatedData.description && { description: validatedData.description }),
@@ -122,8 +128,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     });
   } catch (error) {
     if (error && typeof error === 'object' && 'name' in error && error.name === 'ZodError') {
+      const zodError = error as unknown as { issues: unknown[] };
       return NextResponse.json(
-        { error: 'Validation error', details: (error as { errors: unknown }).errors },
+        { error: 'Validation error', details: zodError.issues },
         { status: 400 }
       );
     }
@@ -134,8 +141,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE /api/forms/[id] - Delete a form
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
     const user = await getCurrentUser();
 
     if (!user) {
@@ -148,7 +156,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     // Check if form exists and user owns it
     const existingForm = await prisma.permissionForm.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingForm) {
@@ -160,7 +168,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     }
 
     await prisma.permissionForm.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ message: 'Form deleted successfully' });

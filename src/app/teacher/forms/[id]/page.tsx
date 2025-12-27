@@ -1,0 +1,413 @@
+'use client';
+
+import { useState, useEffect, use } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { DistributeButton } from '@/components/forms/DistributeButton';
+
+interface FormData {
+  form: {
+    id: string;
+    title: string;
+    description: string;
+    eventDate: string;
+    eventType: string;
+    deadline: string;
+    status: 'DRAFT' | 'ACTIVE' | 'CLOSED';
+    createdAt: string;
+    teacher: {
+      id: string;
+      name: string;
+      email: string;
+    };
+    fields: Array<{
+      id: string;
+      fieldType: string;
+      label: string;
+      required: boolean;
+      order: number;
+    }>;
+    submissions: Array<{
+      id: string;
+      status: 'PENDING' | 'SIGNED' | 'DECLINED';
+      signedAt: string | null;
+      parent: {
+        id: string;
+        name: string;
+        email: string;
+      };
+      student: {
+        id: string;
+        name: string;
+        grade: string;
+      };
+    }>;
+  };
+}
+
+export default function FormDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const router = useRouter();
+  const [data, setData] = useState<FormData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    async function loadForm() {
+      try {
+        const res = await fetch(`/api/forms/${id}`);
+        if (!res.ok) {
+          if (res.status === 401) {
+            router.push('/login');
+            return;
+          }
+          throw new Error('Failed to load form');
+        }
+        const formData = await res.json();
+        setData(formData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load form');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadForm();
+  }, [id, router]);
+
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this form? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/forms/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete form');
+      router.push('/teacher/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete');
+      setDeleting(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: 'ACTIVE' | 'CLOSED') => {
+    try {
+      const res = await fetch(`/api/forms/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error('Failed to update status');
+      // Reload form data
+      const formData = await res.json();
+      setData({ form: formData.form });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update status');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50">
+        <div className="flex animate-pulse flex-col items-center gap-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent" />
+          <p className="text-gray-600">Loading form...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50 p-4">
+        <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-xl">
+          <div className="mb-4 text-5xl">😕</div>
+          <h1 className="mb-2 text-2xl font-bold text-gray-900">Form Not Found</h1>
+          <p className="mb-6 text-gray-600">{error}</p>
+          <Link href="/teacher/dashboard" className="text-emerald-600 hover:underline">
+            Return to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { form } = data;
+  const eventDate = new Date(form.eventDate);
+  const deadline = new Date(form.deadline);
+  const signedCount = form.submissions.filter((s) => s.status === 'SIGNED').length;
+  const pendingCount = form.submissions.filter((s) => s.status === 'PENDING').length;
+  const totalSubmissions = form.submissions.length;
+
+  const statusColors = {
+    DRAFT: 'bg-gray-100 text-gray-800',
+    ACTIVE: 'bg-emerald-100 text-emerald-800',
+    CLOSED: 'bg-red-100 text-red-800',
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50">
+      {/* Header */}
+      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/teacher/dashboard"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Dashboard
+            </Link>
+          </div>
+          <h1 className="font-bold text-gray-900">Permission Please 📝</h1>
+          <div className="flex items-center gap-3">
+            {form.status === 'DRAFT' && (
+              <button
+                onClick={() => handleStatusChange('ACTIVE')}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+              >
+                Activate Form
+              </button>
+            )}
+            {form.status === 'ACTIVE' && (
+              <>
+                <DistributeButton formId={form.id} />
+                <button
+                  onClick={() => handleStatusChange('CLOSED')}
+                  className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+                >
+                  Close Form
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Form Header Card */}
+        <div className="mb-6 overflow-hidden rounded-2xl bg-white shadow-lg">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-8 text-white">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="mb-2 flex items-center gap-3">
+                  <span
+                    className={`rounded-full px-3 py-1 text-sm font-medium ${statusColors[form.status]}`}
+                  >
+                    {form.status}
+                  </span>
+                  <span className="text-sm text-emerald-100">
+                    {form.eventType.replace('_', ' ')}
+                  </span>
+                </div>
+                <h2 className="text-3xl font-bold">{form.title}</h2>
+                <p className="mt-2 text-emerald-100">
+                  Created {new Date(form.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6">
+            {/* Stats Row */}
+            <div className="mb-6 grid grid-cols-4 gap-4">
+              <div className="rounded-lg bg-gray-50 p-4 text-center">
+                <p className="text-3xl font-bold text-gray-900">{totalSubmissions}</p>
+                <p className="text-sm text-gray-500">Total Sent</p>
+              </div>
+              <div className="rounded-lg bg-emerald-50 p-4 text-center">
+                <p className="text-3xl font-bold text-emerald-600">{signedCount}</p>
+                <p className="text-sm text-gray-500">Signed</p>
+              </div>
+              <div className="rounded-lg bg-amber-50 p-4 text-center">
+                <p className="text-3xl font-bold text-amber-600">{pendingCount}</p>
+                <p className="text-sm text-gray-500">Pending</p>
+              </div>
+              <div className="rounded-lg bg-blue-50 p-4 text-center">
+                <p className="text-3xl font-bold text-blue-600">
+                  {totalSubmissions > 0 ? Math.round((signedCount / totalSubmissions) * 100) : 0}%
+                </p>
+                <p className="text-sm text-gray-500">Completion</p>
+              </div>
+            </div>
+
+            {/* Dates */}
+            <div className="mb-6 grid grid-cols-2 gap-4">
+              <div className="rounded-lg border border-gray-200 p-4">
+                <p className="mb-1 text-sm text-gray-500">📅 Event Date</p>
+                <p className="font-semibold text-gray-900">
+                  {eventDate.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 p-4">
+                <p className="mb-1 text-sm text-gray-500">⏰ Signature Deadline</p>
+                <p className="font-semibold text-gray-900">
+                  {deadline.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </p>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="mb-6">
+              <h3 className="mb-2 font-semibold text-gray-900">Description</h3>
+              <p className="whitespace-pre-wrap text-gray-700">{form.description}</p>
+            </div>
+
+            {/* Custom Fields */}
+            {form.fields.length > 0 && (
+              <div className="mb-6">
+                <h3 className="mb-2 font-semibold text-gray-900">Custom Fields</h3>
+                <div className="space-y-2">
+                  {form.fields.map((field) => (
+                    <div
+                      key={field.id}
+                      className="flex items-center gap-3 rounded-lg bg-gray-50 px-4 py-2 text-sm text-gray-600"
+                    >
+                      <span className="font-medium">{field.label}</span>
+                      <span className="text-gray-400">•</span>
+                      <span className="capitalize">{field.fieldType}</span>
+                      {field.required && (
+                        <>
+                          <span className="text-gray-400">•</span>
+                          <span className="text-red-500">Required</span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Submissions Table */}
+        <div className="mb-6 overflow-hidden rounded-2xl bg-white shadow-lg">
+          <div className="border-b border-gray-200 px-6 py-4">
+            <h3 className="font-semibold text-gray-900">Signature Status</h3>
+          </div>
+
+          {form.submissions.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="mb-4 text-5xl">📨</div>
+              <h4 className="mb-2 text-xl font-semibold text-gray-900">No Recipients Yet</h4>
+              <p className="mb-4 text-gray-600">
+                This form hasn&apos;t been sent to any parents yet.
+              </p>
+              {form.status === 'ACTIVE' && <DistributeButton formId={form.id} />}
+              {form.status === 'DRAFT' && (
+                <button
+                  onClick={() => handleStatusChange('ACTIVE')}
+                  className="rounded-lg bg-emerald-600 px-6 py-2 font-medium text-white transition-colors hover:bg-emerald-700"
+                >
+                  Activate & Send
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      Student
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      Parent
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      Signed At
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {form.submissions.map((submission) => (
+                    <tr key={submission.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <p className="font-medium text-gray-900">{submission.student.name}</p>
+                          <p className="text-sm text-gray-500">Grade {submission.student.grade}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <p className="font-medium text-gray-900">{submission.parent.name}</p>
+                          <p className="text-sm text-gray-500">{submission.parent.email}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
+                            submission.status === 'SIGNED'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : submission.status === 'DECLINED'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {submission.status === 'SIGNED' && '✓ '}
+                          {submission.status === 'DECLINED' && '✗ '}
+                          {submission.status === 'PENDING' && '⏳ '}
+                          {submission.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
+                        {submission.signedAt ? new Date(submission.signedAt).toLocaleString() : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between">
+          <Link
+            href={`/teacher/forms/${form.id}/edit`}
+            className="font-medium text-gray-600 hover:text-gray-900"
+          >
+            ✏️ Edit Form
+          </Link>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+          >
+            {deleting ? 'Deleting...' : '🗑️ Delete Form'}
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+}

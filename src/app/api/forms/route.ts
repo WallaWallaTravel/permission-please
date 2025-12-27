@@ -115,8 +115,9 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     if (error && typeof error === 'object' && 'name' in error && error.name === 'ZodError') {
+      const zodError = error as unknown as { issues: unknown[] };
       return NextResponse.json(
-        { error: 'Validation error', details: (error as { errors: unknown }).errors },
+        { error: 'Validation error', details: zodError.issues },
         { status: 400 }
       );
     }

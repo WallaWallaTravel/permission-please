@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from '@/components/shared/Providers';
+import { SkipLink } from '@/components/ui/skip-link';
 
 export const metadata: Metadata = {
   title: 'Permission Please - Digital Permission Slips',
@@ -16,7 +17,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <Providers>{children}</Providers>
+        <SkipLink />
+        <Providers>
+          <main id="main-content" tabIndex={-1}>
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   );

@@ -11,6 +11,26 @@ enum Role {
   TEACHER
   PARENT
   ADMIN
+  SUPER_ADMIN
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  subdomain String   @unique
+  logoUrl   String?  @map("logo_url")
+  primaryColor String? @map("primary_color")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users    User[]
+  students Student[]
+  forms    PermissionForm[]
+  invites  Invite[]
+
+  @@map("schools")
 }
 
 enum FormStatus {
@@ -38,14 +58,19 @@ model User {
   name      String
   password  String
   role      Role
+  schoolId  String?  @map("school_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
+  school           School?             @relation(fields: [schoolId], references: [id])
   forms            PermissionForm[]    @relation("TeacherForms")
   parentStudents   ParentStudent[]
   formSubmissions  FormSubmission[]
+  invitesSent      Invite[]            @relation("InviteCreator")
+  auditLogs        AuditLog[]
 
+  @@index([schoolId])
   @@map("users")
 }
 
@@ -53,12 +78,15 @@ model Student {
   id        String   @id @default(cuid())
   name      String
   grade     String
+  schoolId  String?  @map("school_id")
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
+  school          School?          @relation(fields: [schoolId], references: [id])
   parents         ParentStudent[]
   formSubmissions FormSubmission[]
 
+  @@index([schoolId])
   @@map("students")
 }
 
@@ -77,6 +105,7 @@ model ParentStudent {
 model PermissionForm {
   id          String      @id @default(cuid())
   teacherId   String      @map("teacher_id")
+  schoolId    String?     @map("school_id")
   title       String
   description String      @db.Text
   eventDate   DateTime    @map("event_date")
@@ -87,11 +116,13 @@ model PermissionForm {
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
   // Relations
+  school      School?          @relation(fields: [schoolId], references: [id])
   teacher     User             @relation("TeacherForms", fields: [teacherId], references: [id], onDelete: Cascade)
   fields      FormField[]
   submissions FormSubmission[]
 
   @@index([teacherId, status])
+  @@index([schoolId])
   @@map("permission_forms")
 }
 
@@ -145,4 +176,56 @@ model FieldResponse {
 
   @@index([submissionId])
   @@map("field_responses")
+}
+
+model Invite {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  role      Role     @default(ADMIN)
+  schoolId  String?  @map("school_id")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  school    School?  @relation(fields: [schoolId], references: [id])
+  creator   User     @relation("InviteCreator", fields: [createdBy], references: [id])
+
+  @@index([token])
+  @@index([email])
+  @@map("invites")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  metadata  Json?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([token])
+  @@index([email])
+  @@map("password_reset_tokens")
 }
