@@ -55,11 +55,12 @@ export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') || '';
   const subdomain = getSubdomain(host);
 
-  // Skip API routes, static files, and Next.js internals
+  // Skip API routes, static files, Next.js internals, and test pages
   if (
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
+    pathname.startsWith('/sentry-test') ||
     pathname.includes('.')
   ) {
     return NextResponse.next();
