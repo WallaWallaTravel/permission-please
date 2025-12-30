@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { sendInviteEmail } from '@/lib/email/resend';
 import { z } from 'zod';
 import crypto from 'crypto';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 const createInviteSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -12,7 +13,10 @@ const createInviteSchema = z.object({
 });
 
 // GET /api/admin/invites - List all invites
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 
@@ -45,6 +49,9 @@ export async function GET() {
 
 // POST /api/admin/invites - Create a new invite
 export async function POST(request: NextRequest) {
+  const rateLimited = applyRateLimit(request, 'email');
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 

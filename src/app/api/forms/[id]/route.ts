@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { updateFormSchema } from '@/lib/validations/form-schema';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -9,6 +10,9 @@ type RouteContext = {
 
 // GET /api/forms/[id] - Get a specific form
 export async function GET(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const { id } = await context.params;
     const user = await getCurrentUser();
@@ -71,6 +75,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 // PATCH /api/forms/[id] - Update a form
 export async function PATCH(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const { id } = await context.params;
     const user = await getCurrentUser();
@@ -142,6 +149,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
 // DELETE /api/forms/[id] - Delete a form
 export async function DELETE(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const { id } = await context.params;
     const user = await getCurrentUser();

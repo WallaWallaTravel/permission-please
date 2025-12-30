@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 const studentRowSchema = z.object({
   name: z.string().min(1, 'Student name is required'),
@@ -25,6 +26,9 @@ interface ImportResult {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 

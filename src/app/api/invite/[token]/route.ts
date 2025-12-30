@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 type RouteContext = {
   params: Promise<{ token: string }>;
@@ -7,6 +8,9 @@ type RouteContext = {
 
 // GET /api/invite/[token] - Validate an invite token
 export async function GET(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const { token } = await context.params;
 

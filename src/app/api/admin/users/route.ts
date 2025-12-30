@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 // GET /api/admin/users - List all users (optionally filtered by schoolId)
 export async function GET(request: Request) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 

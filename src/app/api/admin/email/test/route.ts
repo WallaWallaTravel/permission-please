@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { Resend } from 'resend';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 // POST /api/admin/email/test - Send a test email
 export async function POST(request: NextRequest) {
+  const rateLimited = applyRateLimit(request, 'email');
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 

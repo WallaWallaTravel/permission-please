@@ -218,3 +218,46 @@ export const rateLimitPresets = {
   // Health checks (lenient)
   health: { max: 1000, windowMs: 60000 },
 };
+
+/**
+ * Simple rate limit check for use at the start of any handler.
+ * Returns a 429 response if rate limited, or null if OK.
+ *
+ * Usage:
+ * ```typescript
+ * const rateLimited = applyRateLimit(request, 'api');
+ * if (rateLimited) return rateLimited;
+ * // Continue with handler...
+ * ```
+ */
+export function applyRateLimit(
+  request: Request,
+  preset: keyof typeof rateLimitPresets = 'api'
+): NextResponse | null {
+  const config = rateLimitPresets[preset];
+  const result = checkRateLimit(request, config);
+
+  if (!result.success) {
+    const response = NextResponse.json(
+      {
+        error: 'Too Many Requests',
+        message: 'Too many requests, please try again later',
+        retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000),
+      },
+      { status: 429 }
+    );
+
+    const headers = createRateLimitHeaders(result);
+    headers.forEach((value, key) => {
+      response.headers.set(key, value);
+    });
+    response.headers.set(
+      'Retry-After',
+      Math.ceil((result.resetTime - Date.now()) / 1000).toString()
+    );
+
+    return response;
+  }
+
+  return null;
+}

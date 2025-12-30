@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
+import * as Sentry from '@sentry/nextjs';
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -28,7 +29,11 @@ function TryAgainButton({ onReset }: { onReset: () => void }) {
 
 export default function Error({ error, reset }: ErrorProps) {
   useEffect(() => {
-    // Log the error to an error reporting service
+    // Log the error to Sentry
+    Sentry.captureException(error, {
+      tags: { errorBoundary: 'route' },
+      extra: { digest: error.digest },
+    });
     console.error('Application error:', error);
   }, [error]);
 

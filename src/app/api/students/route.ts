@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 const addStudentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -10,7 +11,10 @@ const addStudentSchema = z.object({
 });
 
 // GET - List all students
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -44,6 +48,9 @@ export async function GET() {
 
 // POST - Add new student
 export async function POST(request: NextRequest) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const session = await getServerSession(authOptions);
 

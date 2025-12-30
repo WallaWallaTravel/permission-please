@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { sendSignatureConfirmation } from '@/lib/email/resend';
 import { auditLog, getRequestContext } from '@/lib/audit';
 import { logger } from '@/lib/logger';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -12,6 +13,9 @@ type RouteContext = {
 
 // GET - Load form data for signing (supports multiple students)
 export async function GET(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -119,6 +123,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 // POST - Submit signature
 export async function POST(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'formSubmit');
+  if (rateLimited) return rateLimited;
+
   try {
     const session = await getServerSession(authOptions);
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { z } from 'zod';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -14,6 +15,9 @@ const updateUserSchema = z.object({
 
 // GET /api/admin/users/[id] - Get a specific user
 export async function GET(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const { id } = await context.params;
     const currentUser = await getCurrentUser();
@@ -66,6 +70,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 // PATCH /api/admin/users/[id] - Update user role or school
 export async function PATCH(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const { id } = await context.params;
     const currentUser = await getCurrentUser();
@@ -144,6 +151,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
 // DELETE /api/admin/users/[id] - Delete a user
 export async function DELETE(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const { id } = await context.params;
     const currentUser = await getCurrentUser();

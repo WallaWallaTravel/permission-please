@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { createFormSchema } from '@/lib/validations/form-schema';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 // GET /api/forms - List all forms for the current user
 export async function GET(request: Request) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 
@@ -56,6 +60,9 @@ export async function GET(request: Request) {
 
 // POST /api/forms - Create a new form
 export async function POST(request: Request) {
+  const rateLimited = applyRateLimit(request, 'formSubmit');
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 

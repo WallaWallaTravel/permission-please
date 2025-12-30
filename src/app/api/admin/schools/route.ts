@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { z } from 'zod';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 const createSchoolSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
@@ -22,7 +23,10 @@ const createSchoolSchema = z.object({
 });
 
 // GET /api/admin/schools - List all schools
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 
@@ -56,6 +60,9 @@ export async function GET() {
 
 // POST /api/admin/schools - Create a new school
 export async function POST(request: NextRequest) {
+  const rateLimited = applyRateLimit(request, 'api');
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 

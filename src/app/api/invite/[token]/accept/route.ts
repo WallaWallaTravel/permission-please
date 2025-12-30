@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 type RouteContext = {
   params: Promise<{ token: string }>;
@@ -20,6 +21,9 @@ const acceptInviteSchema = z.object({
 
 // POST /api/invite/[token]/accept - Accept an invite and create account
 export async function POST(request: NextRequest, context: RouteContext) {
+  const rateLimited = applyRateLimit(request, 'auth');
+  if (rateLimited) return rateLimited;
+
   try {
     const { token } = await context.params;
 

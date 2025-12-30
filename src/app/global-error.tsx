@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 // Force dynamic rendering to avoid static prerender issues
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,12 @@ interface GlobalErrorProps {
  */
 export default function GlobalError({ error }: GlobalErrorProps) {
   useEffect(() => {
+    // Log the critical error to Sentry
+    Sentry.captureException(error, {
+      tags: { errorBoundary: 'global' },
+      level: 'fatal',
+      extra: { digest: error.digest },
+    });
     console.error('Global application error:', error);
   }, [error]);
 

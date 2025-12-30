@@ -3,9 +3,13 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db';
 import { sendPermissionRequest } from '@/lib/email/resend';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 // POST - Distribute form to parents
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const rateLimited = applyRateLimit(request, 'email');
+  if (rateLimited) return rateLimited;
+
   try {
     const session = await getServerSession(authOptions);
 
