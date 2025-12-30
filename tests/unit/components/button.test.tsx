@@ -96,7 +96,8 @@ describe('Button Component', () => {
     // Check for spinner icon (Loader2 component)
     const spinner = button.querySelector('svg');
     expect(spinner).toBeInTheDocument();
-    expect(spinner?.className).toContain('animate-spin');
+    // SVG elements use class attribute, not className property
+    expect(spinner?.getAttribute('class')).toContain('animate-spin');
   });
 
   it('shows loading text when provided', () => {

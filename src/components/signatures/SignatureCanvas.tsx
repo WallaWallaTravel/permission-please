@@ -128,11 +128,14 @@ export function SignatureCanvas({
   const clearSignature = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    if (!ctx || !canvas) return;
 
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, height);
+    // Clear canvas if context is available
+    if (ctx && canvas) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+    }
 
+    // Always notify parent and reset state
     setHasSignature(false);
     onSignatureChange(null);
   }, [width, height, onSignatureChange]);

@@ -46,6 +46,31 @@ test.describe('Authentication Flow', () => {
   });
 });
 
+test.describe('Successful Authentication', () => {
+  test('teacher can login with valid credentials', async ({ page }) => {
+    await page.goto('/login');
+
+    await page.fill('input[name="email"]', 'teacher@test.com');
+    await page.fill('input[name="password"]', 'password123');
+    await page.click('button[type="submit"]');
+
+    // Should redirect to teacher dashboard
+    await expect(page).toHaveURL(/\/teacher\/dashboard/, { timeout: 10000 });
+    await expect(page.getByText(/welcome back/i)).toBeVisible();
+  });
+
+  test('parent can login with valid credentials', async ({ page }) => {
+    await page.goto('/login');
+
+    await page.fill('input[name="email"]', 'parent1@test.com');
+    await page.fill('input[name="password"]', 'password123');
+    await page.click('button[type="submit"]');
+
+    // Should redirect to parent dashboard
+    await expect(page).toHaveURL(/\/parent\/dashboard/, { timeout: 10000 });
+  });
+});
+
 test.describe('Protected Routes', () => {
   test('teacher dashboard redirects to login when not authenticated', async ({ page }) => {
     await page.goto('/teacher/dashboard');

@@ -17,8 +17,12 @@ describe('Card Components', () => {
     });
 
     it('applies custom className', () => {
-      render(<Card className="custom-card">Content</Card>);
-      const card = screen.getByText('Content').parentElement || screen.getByText('Content');
+      render(
+        <Card className="custom-card" data-testid="card">
+          Content
+        </Card>
+      );
+      const card = screen.getByTestId('card');
       expect(card.className).toContain('custom-card');
     });
 

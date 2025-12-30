@@ -45,7 +45,7 @@ const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('border-t border-gray-100 bg-gray-50 px-6 py-4', className)}
+      className={cn('flex items-center border-t border-gray-100 bg-gray-50 px-6 py-4', className)}
       {...props}
     />
   )

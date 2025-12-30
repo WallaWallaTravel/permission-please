@@ -254,11 +254,14 @@ export default function HomePage() {
             <span className="text-lg">📝</span>
             <span className="font-medium text-slate-700">Permission Please</span>
           </div>
-          <p>Built with ❤️ for teachers, parents, and students</p>
+          <p>Built with care for teachers, parents, and students</p>
           <div className="flex gap-6">
-            <span>Next.js</span>
-            <span>TypeScript</span>
-            <span>Prisma</span>
+            <a href="/privacy" className="hover:text-slate-700">
+              Privacy
+            </a>
+            <a href="/terms" className="hover:text-slate-700">
+              Terms
+            </a>
           </div>
         </div>
       </footer>

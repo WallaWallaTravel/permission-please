@@ -137,7 +137,8 @@ describe('Select Component', () => {
     // Check for the chevron icon (SVG element)
     const svg = container.querySelector('svg');
     expect(svg).toBeInTheDocument();
-    expect(svg?.className).toContain('pointer-events-none');
+    // SVG elements use class attribute, not className property
+    expect(svg?.getAttribute('class')).toContain('pointer-events-none');
   });
 
   it('handles focus and blur events', () => {

@@ -109,7 +109,11 @@ export default function SignupPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+                >
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
               )}
@@ -149,9 +153,10 @@ export default function SignupPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">I am a...</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3" role="group" aria-label="Select your role">
                   <button
                     type="button"
+                    aria-pressed={formData.role === 'TEACHER'}
                     onClick={() => setFormData({ ...formData, role: 'TEACHER' })}
                     className={`flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 font-medium transition ${
                       formData.role === 'TEACHER'
@@ -159,11 +164,14 @@ export default function SignupPage() {
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span className="text-xl">👩‍🏫</span>
+                    <span className="text-xl" aria-hidden="true">
+                      👩‍🏫
+                    </span>
                     Teacher
                   </button>
                   <button
                     type="button"
+                    aria-pressed={formData.role === 'PARENT'}
                     onClick={() => setFormData({ ...formData, role: 'PARENT' })}
                     className={`flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 font-medium transition ${
                       formData.role === 'PARENT'
@@ -171,7 +179,9 @@ export default function SignupPage() {
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span className="text-xl">👨‍👩‍👧</span>
+                    <span className="text-xl" aria-hidden="true">
+                      👨‍👩‍👧
+                    </span>
                     Parent
                   </button>
                 </div>

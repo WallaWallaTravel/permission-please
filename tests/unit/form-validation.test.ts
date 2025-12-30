@@ -6,9 +6,9 @@ describe('Form Validation Schema', () => {
     const validForm = {
       title: 'Zoo Field Trip',
       description: 'Annual trip to the city zoo',
-      eventDate: new Date('2024-06-15T09:00:00'),
+      eventDate: '2024-06-15T09:00:00.000Z',
       eventType: 'FIELD_TRIP',
-      deadline: new Date('2024-06-10T23:59:59'),
+      deadline: '2024-06-10T23:59:59.000Z',
       status: 'DRAFT',
       fields: [],
     };
@@ -21,9 +21,9 @@ describe('Form Validation Schema', () => {
     const invalidForm = {
       title: '',
       description: 'Some description',
-      eventDate: new Date('2024-06-15T09:00:00'),
+      eventDate: '2024-06-15T09:00:00.000Z',
       eventType: 'FIELD_TRIP',
-      deadline: new Date('2024-06-10T23:59:59'),
+      deadline: '2024-06-10T23:59:59.000Z',
       status: 'DRAFT',
       fields: [],
     };
@@ -36,9 +36,9 @@ describe('Form Validation Schema', () => {
     const invalidForm = {
       title: 'Test Form',
       description: 'Some description',
-      eventDate: new Date('2024-06-15T09:00:00'),
+      eventDate: '2024-06-15T09:00:00.000Z',
       eventType: 'INVALID_TYPE',
-      deadline: new Date('2024-06-10T23:59:59'),
+      deadline: '2024-06-10T23:59:59.000Z',
       status: 'DRAFT',
       fields: [],
     };
@@ -51,9 +51,9 @@ describe('Form Validation Schema', () => {
     const validForm = {
       title: 'Test Form',
       description: 'Description here',
-      eventDate: new Date('2024-06-15T09:00:00'),
+      eventDate: '2024-06-15T09:00:00.000Z',
       eventType: 'ACTIVITY',
-      deadline: new Date('2024-06-10T23:59:59'),
+      deadline: '2024-06-10T23:59:59.000Z',
       status: 'ACTIVE',
       fields: [
         { fieldType: 'text', label: 'Emergency Contact', required: true, order: 1 },

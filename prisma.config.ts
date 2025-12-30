@@ -7,6 +7,8 @@ export default defineConfig({
   },
   engine: 'classic',
   datasource: {
-    url: env('DATABASE_URL'),
+    // Use DIRECT_URL for migrations (bypasses pgbouncer)
+    // Runtime uses DATABASE_URL from schema.prisma (pooled connection)
+    url: env('DIRECT_URL'),
   },
 });

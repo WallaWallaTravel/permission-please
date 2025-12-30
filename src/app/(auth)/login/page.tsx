@@ -95,7 +95,11 @@ function LoginForm() {
           <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+                >
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
               )}

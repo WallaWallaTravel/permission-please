@@ -20,7 +20,7 @@ npm run dev
 ### Development
 
 ```bash
-npm run dev              # Start dev server (localhost:3000)
+npm run dev              # Start dev server (localhost:6001)
 npm run build            # Build for production
 npm run start            # Start production server
 ```
@@ -176,31 +176,37 @@ export function UserProfile() {
 
 ## 📝 Form Handling
 
-### With React Hook Form + Zod
+### With Zod Validation
 
 ```typescript
 'use client';
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { z } from 'zod';
 
 const formSchema = z.object({
   title: z.string().min(1, 'Title is required'),
-  deadline: z.date(),
+  deadline: z.string(),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
 export function CreateFormDialog() {
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-  });
+  const [title, setTitle] = useState('');
+  const [error, setError] = useState('');
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = formSchema.safeParse({ title, deadline: new Date().toISOString() });
+
+    if (!result.success) {
+      setError(result.error.errors[0].message);
+      return;
+    }
+
     const response = await fetch('/api/forms', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(result.data),
     });
 
     if (response.ok) {
@@ -209,11 +215,9 @@ export function CreateFormDialog() {
   };
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)}>
-      <input {...form.register('title')} />
-      {form.formState.errors.title && (
-        <span>{form.formState.errors.title.message}</span>
-      )}
+    <form onSubmit={onSubmit}>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} />
+      {error && <span>{error}</span>}
       <button type="submit">Create</button>
     </form>
   );
@@ -384,47 +388,31 @@ export default async function FormsPage() {
 }
 ```
 
-### Client Component with React Query
+### Client Component with Fetch
 
 ```typescript
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 
 export function FormsList() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['forms'],
-    queryFn: async () => {
-      const res = await fetch('/api/forms');
-      return res.json();
-    },
-  });
+  const [forms, setForms] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/forms')
+      .then(res => res.json())
+      .then(data => setForms(data.forms))
+      .catch(err => setError(err.message))
+      .finally(() => setIsLoading(false));
+  }, []);
 
   if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error loading forms</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return <div>{/* Render forms */}</div>;
 }
-```
-
-### Mutations with Optimistic Updates
-
-```typescript
-const mutation = useMutation({
-  mutationFn: createForm,
-  onMutate: async (newForm) => {
-    await queryClient.cancelQueries({ queryKey: ['forms'] });
-    const previous = queryClient.getQueryData(['forms']);
-    queryClient.setQueryData(['forms'], (old) => [...old, newForm]);
-    return { previous };
-  },
-  onError: (err, newForm, context) => {
-    queryClient.setQueryData(['forms'], context.previous);
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['forms'] });
-  },
-});
 ```
 
 ## 📧 Sending Emails
@@ -459,9 +447,10 @@ npm run dev
 ### Database connection issues
 
 ```bash
-# Check DATABASE_URL in .env.local
-# Restart database
-docker restart postgres-dev
+# Check DATABASE_URL in .env
+# Verify Supabase project is running at supabase.com/dashboard
+# Try regenerating Prisma client
+npx prisma generate
 ```
 
 ### Tests failing after update
@@ -481,8 +470,8 @@ import '@testing-library/jest-dom';
 ## 📚 Documentation Links
 
 - [Next.js Docs](https://nextjs.org/docs)
-- [React Query](https://tanstack.com/query/latest)
 - [Prisma Docs](https://www.prisma.io/docs)
+- [Supabase Docs](https://supabase.com/docs)
 - [Tailwind CSS](https://tailwindcss.com/docs)
 - [shadcn/ui](https://ui.shadcn.com/)
 - [Vitest](https://vitest.dev/)
