@@ -25,7 +25,9 @@
     "db:validate": "prisma validate",
     "postinstall": "prisma generate",
     "type-check": "tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "verify-env": "bash scripts/verify-env.sh",
+    "predeploy": "npm run verify-env && npm run build"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

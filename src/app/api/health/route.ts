@@ -24,6 +24,8 @@ interface HealthStatus {
     database: {
       status: 'up' | 'down';
       latencyMs?: number;
+      projectId?: string; // Supabase project ID for verification
+      userCount?: number; // Verify schema exists
       error?: string;
     };
     memory: {
@@ -35,25 +37,46 @@ interface HealthStatus {
   };
 }
 
+// Extract Supabase project ID from DATABASE_URL for verification
+function getSupabaseProjectId(): string | null {
+  const dbUrl = process.env.DATABASE_URL || '';
+  // Format: postgresql://postgres.PROJECT_ID:password@...
+  const match = dbUrl.match(/postgres\.([a-z0-9]+):/);
+  return match ? match[1] : null;
+}
+
 // Track server start time for uptime calculation
 const startTime = Date.now();
 
 export async function GET(): Promise<NextResponse<HealthStatus>> {
   const timestamp = new Date().toISOString();
 
-  // Check database connection
+  // Check database connection and verify correct project
   let dbStatus: HealthStatus['checks']['database'] = { status: 'down' };
+  const expectedProjectId = 'djbonsnacfcwovqzjwcs'; // Permission Please Supabase project
+  const actualProjectId = getSupabaseProjectId();
+
   try {
     const dbStart = Date.now();
-    await prisma.$queryRaw`SELECT 1`;
+    // Query actual table to verify schema exists (not just connection)
+    const userCount = await prisma.user.count();
     const dbLatency = Date.now() - dbStart;
+
     dbStatus = {
       status: 'up',
       latencyMs: dbLatency,
+      projectId: actualProjectId || 'unknown',
+      userCount,
     };
+
+    // Warn if connected to wrong project
+    if (actualProjectId && actualProjectId !== expectedProjectId) {
+      dbStatus.error = `WARNING: Connected to wrong Supabase project! Expected: ${expectedProjectId}, Got: ${actualProjectId}`;
+    }
   } catch (error) {
     dbStatus = {
       status: 'down',
+      projectId: actualProjectId || 'unknown',
       error: error instanceof Error ? error.message : 'Unknown database error',
     };
   }

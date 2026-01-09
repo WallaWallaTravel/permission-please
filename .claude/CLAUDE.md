@@ -36,6 +36,11 @@ vercel --prod  # Redeploy to apply
 
 **Lesson Learned**: Always verify DATABASE_URL in Vercel matches the intended Supabase project. Use `vercel env pull` to check current values.
 
+**Safeguards Added**:
+1. Health endpoint (`/api/health`) now shows `projectId` and warns if wrong project
+2. Pre-deploy script: `npm run verify-env` checks DATABASE_URL before deploying
+3. INFRASTRUCTURE.md updated with verification command
+
 ### ESLint react-hooks/purity Errors
 **Problem**: ESLint flags `Date.now()` and `window.location.href` in server components.
 
@@ -134,3 +139,34 @@ HUSKY=0 git commit -m "message"
 ### Known Test Issues
 - `tests/integration/cron.test.ts` - Some tests need mock data updates
 - Auth tests removed (routes were deleted when switching to Google/Magic Link)
+
+---
+
+## Deployment Checklist
+
+Before deploying, always run:
+```bash
+npm run verify-env   # Verify DATABASE_URL points to correct project
+npm run build        # Verify build passes
+```
+
+Or use the combined command:
+```bash
+npm run predeploy    # Runs both verify-env and build
+```
+
+After deploying, verify:
+```bash
+curl https://permissionplease.app/api/health | jq .
+# Check: checks.database.projectId should be "djbonsnacfcwovqzjwcs"
+```
+
+---
+
+## Correct Supabase Project
+
+**Project ID:** `djbonsnacfcwovqzjwcs`
+**Region:** us-west-2
+**Dashboard:** https://supabase.com/dashboard/project/djbonsnacfcwovqzjwcs
+
+If DATABASE_URL ever gets changed to a different project, the health endpoint will show a warning.
