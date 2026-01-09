@@ -11,7 +11,7 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-// GET - Load form data for signing (supports multiple students)
+// GET - Load form data for signing (session auth required)
 export async function GET(request: NextRequest, context: RouteContext) {
   const rateLimited = applyRateLimit(request, 'api');
   if (rateLimited) return rateLimited;
@@ -24,8 +24,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const { id } = await context.params;
+    const parentId = session.user.id;
 
-    // Get the form with teacher info
+    // Get the form with teacher info and documents
     const form = await prisma.permissionForm.findUnique({
       where: { id },
       include: {
@@ -33,6 +34,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
           select: { name: true, email: true },
         },
         fields: {
+          orderBy: { order: 'asc' },
+        },
+        documents: {
           orderBy: { order: 'asc' },
         },
       },
@@ -46,9 +50,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form is not active' }, { status: 400 });
     }
 
-    // Get ALL of the parent's students (multi-student support)
+    // Get all of the parent's students
     const parentStudents = await prisma.parentStudent.findMany({
-      where: { parentId: session.user.id },
+      where: { parentId },
       include: { student: true },
     });
 
@@ -60,7 +64,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const existingSubmissions = await prisma.formSubmission.findMany({
       where: {
         formId: id,
-        parentId: session.user.id,
+        parentId,
         studentId: { in: parentStudents.map((ps) => ps.student.id) },
       },
       select: {
@@ -95,9 +99,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { ipAddress, userAgent } = getRequestContext(request);
     auditLog({
       action: 'FORM_VIEW',
-      userId: session.user.id,
+      userId: parentId,
       userEmail: session.user.email || undefined,
-      userRole: session.user.role,
+      userRole: 'PARENT',
       resourceType: 'PermissionForm',
       resourceId: id,
       ipAddress,
@@ -113,7 +117,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       deadline: form.deadline,
       teacher: form.teacher,
       fields: form.fields,
-      students, // Return all students with their signed status
+      students,
     });
   } catch (error) {
     logger.error('Error loading form for signing', error as Error);
@@ -121,7 +125,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 }
 
-// POST - Submit signature
+// POST - Submit signature (session auth required)
 export async function POST(request: NextRequest, context: RouteContext) {
   const rateLimited = applyRateLimit(request, 'formSubmit');
   if (rateLimited) return rateLimited;
@@ -134,6 +138,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const { id } = await context.params;
+    const parentId = session.user.id;
+    const email = session.user.email;
+    const name = session.user.name;
+
     const body = await request.json();
     const { signatureData, studentId, fieldResponses } = body;
 
@@ -151,6 +159,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       include: {
         teacher: { select: { name: true, email: true } },
         fields: true,
+        school: { select: { name: true } },
       },
     });
 
@@ -171,7 +180,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const parentStudent = await prisma.parentStudent.findUnique({
       where: {
         parentId_studentId: {
-          parentId: session.user.id,
+          parentId,
           studentId,
         },
       },
@@ -182,76 +191,88 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Student not linked to your account' }, { status: 400 });
     }
 
-    // Check if already signed for this student
-    const existingSubmission = await prisma.formSubmission.findUnique({
-      where: {
-        formId_parentId_studentId: {
-          formId: id,
-          parentId: session.user.id,
-          studentId,
+    // Get request context for audit
+    const { ipAddress, userAgent } = getRequestContext(request);
+
+    // Use transaction to prevent race conditions
+    const result = await prisma.$transaction(async (tx) => {
+      // Check if already signed for this student (with row-level locking via transaction)
+      const existingSubmission = await tx.formSubmission.findUnique({
+        where: {
+          formId_parentId_studentId: {
+            formId: id,
+            parentId,
+            studentId,
+          },
         },
-      },
+      });
+
+      if (existingSubmission?.status === 'SIGNED') {
+        return { alreadySigned: true, studentName: parentStudent.student.name };
+      }
+
+      // Create or update submission atomically
+      const submission = await tx.formSubmission.upsert({
+        where: {
+          formId_parentId_studentId: {
+            formId: id,
+            parentId,
+            studentId,
+          },
+        },
+        create: {
+          formId: id,
+          parentId,
+          studentId,
+          signatureData,
+          status: 'SIGNED',
+          signedAt: new Date(),
+          ipAddress,
+        },
+        update: {
+          signatureData,
+          status: 'SIGNED',
+          signedAt: new Date(),
+          ipAddress,
+        },
+      });
+
+      // Save field responses within the same transaction
+      if (fieldResponses && Object.keys(fieldResponses).length > 0) {
+        // Delete existing responses
+        await tx.fieldResponse.deleteMany({
+          where: { submissionId: submission.id },
+        });
+
+        // Create new responses
+        await tx.fieldResponse.createMany({
+          data: Object.entries(fieldResponses).map(([fieldId, response]) => ({
+            submissionId: submission.id,
+            fieldId,
+            response: String(response),
+          })),
+        });
+      }
+
+      return { alreadySigned: false, submission };
     });
 
-    if (existingSubmission?.status === 'SIGNED') {
+    // Handle already signed case (outside transaction)
+    if (result.alreadySigned) {
       return NextResponse.json(
-        { error: `You have already signed this form for ${parentStudent.student.name}` },
+        { error: `You have already signed this form for ${result.studentName}` },
         { status: 400 }
       );
     }
 
-    // Get request context for audit
-    const { ipAddress, userAgent } = getRequestContext(request);
-
-    // Create or update submission
-    const submission = await prisma.formSubmission.upsert({
-      where: {
-        formId_parentId_studentId: {
-          formId: id,
-          parentId: session.user.id,
-          studentId,
-        },
-      },
-      create: {
-        formId: id,
-        parentId: session.user.id,
-        studentId,
-        signatureData,
-        status: 'SIGNED',
-        signedAt: new Date(),
-        ipAddress,
-      },
-      update: {
-        signatureData,
-        status: 'SIGNED',
-        signedAt: new Date(),
-        ipAddress,
-      },
-    });
-
-    // Save field responses
-    if (fieldResponses && Object.keys(fieldResponses).length > 0) {
-      // Delete existing responses
-      await prisma.fieldResponse.deleteMany({
-        where: { submissionId: submission.id },
-      });
-
-      // Create new responses
-      await prisma.fieldResponse.createMany({
-        data: Object.entries(fieldResponses).map(([fieldId, response]) => ({
-          submissionId: submission.id,
-          fieldId,
-          response: String(response),
-        })),
-      });
-    }
+    const submission = result.submission!;
 
     // Audit log signature submission
     auditLog({
       action: 'SIGNATURE_SUBMIT',
-      userId: session.user.id,
-      userEmail: session.user.email || undefined,
-      userRole: session.user.role,
+      userId: parentId,
+      userEmail: email || undefined,
+      userRole: 'PARENT',
       resourceType: 'FormSubmission',
       resourceId: submission.id,
       metadata: {
@@ -265,13 +286,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
 
     // Send confirmation email (async, don't block response)
-    if (session.user.email && process.env.RESEND_API_KEY) {
+    if (email && process.env.RESEND_API_KEY) {
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:6001';
+      const pdfUrl = `${baseUrl}/api/submissions/${submission.id}/pdf`;
+
       sendSignatureConfirmation({
-        parentEmail: session.user.email,
-        parentName: session.user.name || 'Parent',
+        parentEmail: email,
+        parentName: name || 'Parent',
         studentName: parentStudent.student.name,
         formTitle: form.title,
         eventDate: form.eventDate,
+        signedAt: new Date(),
+        pdfUrl,
+        schoolName: form.school?.name,
       }).catch((err) => {
         logger.error('Failed to send confirmation email', err);
       });
@@ -280,7 +307,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     logger.info('Signature submitted successfully', {
       formId: id,
       studentId,
-      parentId: session.user.id,
+      parentId,
     });
 
     return NextResponse.json({
@@ -292,3 +319,4 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Failed to submit signature' }, { status: 500 });
   }
 }
+

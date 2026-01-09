@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 const addStudentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ students });
   } catch (error) {
-    console.error('Error fetching students:', error);
+    logger.error('Error fetching students', error as Error);
     return NextResponse.json({ error: 'Failed to fetch students' }, { status: 500 });
   }
 }
@@ -85,7 +86,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('Error adding student:', error);
+    logger.error('Error adding student', error as Error);
     return NextResponse.json({ error: 'Failed to add student' }, { status: 500 });
   }
 }
+

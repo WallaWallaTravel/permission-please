@@ -84,3 +84,4 @@ test.describe('Protected Routes', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 });
+

@@ -130,3 +130,4 @@ export function LinkParentForm({ students, parents }: LinkParentFormProps) {
     </form>
   );
 }
+

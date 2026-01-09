@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { updateFormSchema } from '@/lib/validations/form-schema';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ form });
   } catch (error) {
-    console.error('Error fetching form:', error);
+    logger.error('Error fetching form', error as Error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -142,7 +143,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    console.error('Error updating form:', error);
+    logger.error('Error updating form', error as Error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -183,7 +184,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ message: 'Form deleted successfully' });
   } catch (error) {
-    console.error('Error deleting form:', error);
+    logger.error('Error deleting form', error as Error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

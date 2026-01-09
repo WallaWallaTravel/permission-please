@@ -52,9 +52,36 @@ export const mockPrismaClient = {
     createMany: vi.fn(),
     deleteMany: vi.fn(),
   },
+  invite: {
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    deleteMany: vi.fn(),
+  },
+  school: {
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  auditLog: {
+    findMany: vi.fn(),
+    create: vi.fn(),
+  },
+  passwordResetToken: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
+    deleteMany: vi.fn(),
+  },
   $connect: vi.fn(),
   $disconnect: vi.fn(),
   $queryRaw: vi.fn(),
+  $transaction: vi.fn(),
 };
 
 // Helper to reset all mocks
@@ -156,6 +183,41 @@ export const mockDataFactory = {
     required: true,
     order: 1,
     options: null,
+    createdAt: new Date(),
+    ...overrides,
+  }),
+
+  school: (overrides = {}) => ({
+    id: 'school-123',
+    name: 'Test Elementary School',
+    address: '123 School St',
+    city: 'Test City',
+    state: 'TS',
+    zipCode: '12345',
+    phone: '555-123-4567',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  }),
+
+  invite: (overrides = {}) => ({
+    id: 'invite-123',
+    token: 'test-invite-token-abc123',
+    email: 'newuser@example.com',
+    role: 'TEACHER' as const,
+    schoolId: 'school-123',
+    createdById: 'admin-123',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    usedAt: null,
+    createdAt: new Date(),
+    ...overrides,
+  }),
+
+  passwordResetToken: (overrides = {}) => ({
+    id: 'reset-123',
+    email: 'user@example.com',
+    token: 'reset-token-abc123',
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
     createdAt: new Date(),
     ...overrides,
   }),

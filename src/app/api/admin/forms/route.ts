@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 // GET /api/admin/forms - List forms (optionally filtered by schoolId)
 export async function GET(request: Request) {
@@ -21,10 +22,19 @@ export async function GET(request: Request) {
 
     // Get query params
     const { searchParams } = new URL(request.url);
-    const schoolId = searchParams.get('schoolId');
+    const requestedSchoolId = searchParams.get('schoolId');
 
-    // Build where clause
-    const where = schoolId ? { schoolId } : {};
+    // Enforce school isolation for non-SUPER_ADMIN users
+    // SUPER_ADMIN can see all, ADMIN can only see their school
+    let effectiveSchoolId: string | null = null;
+    if (user.role === 'SUPER_ADMIN') {
+      effectiveSchoolId = requestedSchoolId; // SUPER_ADMIN can filter or see all
+    } else if (user.schoolId) {
+      effectiveSchoolId = user.schoolId; // ADMIN sees only their school
+    }
+
+    // Build where clause with school isolation
+    const where = effectiveSchoolId ? { schoolId: effectiveSchoolId } : {};
 
     const forms = await prisma.permissionForm.findMany({
       where,
@@ -48,7 +58,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ forms });
   } catch (error) {
-    console.error('Error fetching forms:', error);
+    logger.error('Error fetching forms', error as Error);
     return NextResponse.json({ error: 'Failed to fetch forms' }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { Resend } from 'resend';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 // POST /api/admin/email/test - Send a test email
 export async function POST(request: NextRequest) {
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
       emailId: data?.id,
     });
   } catch (error) {
-    console.error('Error sending test email:', error);
+    logger.error('Error sending test email', error as Error);
     return NextResponse.json({ error: 'Failed to send test email' }, { status: 500 });
   }
 }

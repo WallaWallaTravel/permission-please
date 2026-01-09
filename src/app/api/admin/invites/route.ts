@@ -5,6 +5,7 @@ import { sendInviteEmail } from '@/lib/email/resend';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 const createInviteSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ invites });
   } catch (error) {
-    console.error('Error fetching invites:', error);
+    logger.error('Error fetching invites', error as Error);
     return NextResponse.json({ error: 'Failed to fetch invites' }, { status: 500 });
   }
 }
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
       });
       emailSent = true;
     } catch (emailError) {
-      console.error('Failed to send invite email:', emailError);
+      logger.error('Failed to send invite email', emailError as Error);
       // Don't fail the request if email fails - the invite is still created
     }
 
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('Error creating invite:', error);
+    logger.error('Error creating invite', error as Error);
     return NextResponse.json({ error: 'Failed to create invite' }, { status: 500 });
   }
 }

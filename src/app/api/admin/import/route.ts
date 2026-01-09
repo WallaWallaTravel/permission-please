@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 const studentRowSchema = z.object({
   name: z.string().min(1, 'Student name is required'),
@@ -176,7 +177,7 @@ export async function POST(request: NextRequest) {
       results,
     });
   } catch (error) {
-    console.error('Error during import:', error);
+    logger.error('Error during import', error as Error);
     return NextResponse.json({ error: 'Failed to process import' }, { status: 500 });
   }
 }

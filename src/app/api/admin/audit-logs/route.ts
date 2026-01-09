@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const rateLimited = applyRateLimit(request, 'api');
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching audit logs:', error);
+    logger.error('Error fetching audit logs', error as Error);
     return NextResponse.json({ error: 'Failed to fetch audit logs' }, { status: 500 });
   }
 }

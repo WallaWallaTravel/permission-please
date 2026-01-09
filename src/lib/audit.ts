@@ -14,8 +14,10 @@ export type AuditAction =
   | 'USER_LOGIN'
   | 'USER_LOGOUT'
   | 'USER_SIGNUP'
-  | 'PASSWORD_RESET_REQUEST'
-  | 'PASSWORD_RESET_COMPLETE'
+  | 'GOOGLE_LOGIN'
+  | 'MAGIC_LINK_REQUEST'
+  | 'MAGIC_LINK_VERIFY'
+  | 'MAGIC_LINK_VERIFY_FAILED'
   // Forms
   | 'FORM_CREATE'
   | 'FORM_UPDATE'
@@ -56,8 +58,10 @@ const actionSeverity: Record<AuditAction, AuditSeverity> = {
   USER_LOGIN: 'low',
   USER_LOGOUT: 'low',
   USER_SIGNUP: 'medium',
-  PASSWORD_RESET_REQUEST: 'medium',
-  PASSWORD_RESET_COMPLETE: 'high',
+  GOOGLE_LOGIN: 'low',
+  MAGIC_LINK_REQUEST: 'medium',
+  MAGIC_LINK_VERIFY: 'medium',
+  MAGIC_LINK_VERIFY_FAILED: 'medium',
   FORM_CREATE: 'low',
   FORM_UPDATE: 'medium',
   FORM_DELETE: 'high',

@@ -11,7 +11,7 @@ const authRoutes = ['/login', '/signup'];
 // Role-based route access
 const roleRoutes: Record<string, string[]> = {
   TEACHER: ['/teacher'],
-  ADMIN: ['/teacher', '/parent'], // Admins can access both
+  ADMIN: ['/teacher', '/parent', '/admin'], // Admins can access teacher, parent, and admin
   PARENT: ['/parent'],
   SUPER_ADMIN: ['/teacher', '/parent', '/admin'], // Super admins can access everything
 };

@@ -12,7 +12,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           type={type}
           className={cn(
-            'w-full rounded-lg border-2 bg-white px-4 py-3 text-gray-900 placeholder-gray-400',
+            'w-full rounded-lg border-2 bg-white px-4 py-3 text-gray-900 placeholder-gray-600',
             'transition-colors focus:ring-2 focus:ring-blue-100 focus:outline-none',
             error
               ? 'border-red-300 focus:border-red-500 focus:ring-red-100'

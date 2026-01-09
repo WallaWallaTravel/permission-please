@@ -27,6 +27,13 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+// Known insecure secrets that must not be used in production
+const INSECURE_SECRETS = [
+  'development-secret-change-in-production',
+  'development-secret-min-32-characters-long',
+  'your-secret-key-here-min-32-characters',
+];
+
 /**
  * Validates environment variables and returns typed env object
  * Throws detailed errors if validation fails
@@ -61,6 +68,17 @@ function validateEnv(): Env {
       RATE_LIMIT_MAX: Number(process.env.RATE_LIMIT_MAX) || 100,
       RATE_LIMIT_WINDOW_MS: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
     };
+  }
+
+  // In production, verify NEXTAUTH_SECRET is not a known insecure value
+  if (process.env.NODE_ENV === 'production') {
+    const secret = result.data.NEXTAUTH_SECRET;
+    if (INSECURE_SECRETS.some((insecure) => secret.includes(insecure))) {
+      throw new Error(
+        '🔐 SECURITY ERROR: NEXTAUTH_SECRET contains an insecure development value. ' +
+          'Generate a secure secret with: openssl rand -base64 32'
+      );
+    }
   }
 
   return result.data;

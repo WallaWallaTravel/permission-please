@@ -13,6 +13,15 @@ interface Student {
   hasSigned?: boolean;
 }
 
+interface FormDocument {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  description: string | null;
+  source: string;
+  requiresAck: boolean;
+}
+
 interface FormData {
   id: string;
   title: string;
@@ -29,6 +38,7 @@ interface FormData {
     label: string;
     required: boolean;
   }>;
+  documents: FormDocument[];
   students: Student[]; // Changed to array for multi-student support
 }
 
@@ -43,6 +53,7 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
   const [signature, setSignature] = useState<string | null>(null);
   const [fieldResponses, setFieldResponses] = useState<Record<string, string>>({});
   const [agreed, setAgreed] = useState(false);
+  const [documentAcks, setDocumentAcks] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     async function loadForm() {
@@ -81,7 +92,16 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
     setSignature(null);
     setAgreed(false);
     setFieldResponses({});
+    setDocumentAcks({});
   };
+
+  const handleDocumentAck = (docId: string, checked: boolean) => {
+    setDocumentAcks((prev) => ({ ...prev, [docId]: checked }));
+  };
+
+  // Check if all required documents are acknowledged
+  const requiredDocs = form?.documents?.filter((d) => d.requiresAck) || [];
+  const allDocsAcknowledged = requiredDocs.every((d) => documentAcks[d.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +118,11 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
 
     if (!agreed) {
       setError('Please agree to the terms');
+      return;
+    }
+
+    if (!allDocsAcknowledged) {
+      setError('Please acknowledge all required documents');
       return;
     }
 
@@ -268,6 +293,66 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
               <h3 className="mb-2 font-semibold text-gray-900">Event Details</h3>
               <p className="whitespace-pre-wrap text-gray-700">{form.description}</p>
             </div>
+
+            {/* External Documents */}
+            {form.documents && form.documents.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <h3 className="mb-3 flex items-center gap-2 font-semibold text-amber-900">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Required Documents ({form.documents.length})
+                </h3>
+                <p className="mb-4 text-sm text-amber-800">
+                  Please review and acknowledge the following documents before signing.
+                </p>
+                <div className="space-y-3">
+                  {form.documents.map((doc) => (
+                    <div key={doc.id} className="rounded-lg bg-white p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-lg bg-red-100 p-2">
+                            <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{doc.fileName}</p>
+                            {doc.description && (
+                              <p className="mt-1 text-sm text-gray-600">{doc.description}</p>
+                            )}
+                            <span className="mt-1 inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                              {doc.source === 'external' ? 'External Venue' : doc.source === 'school' ? 'School Document' : 'District Policy'}
+                            </span>
+                          </div>
+                        </div>
+                        <a
+                          href={doc.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                        >
+                          View PDF
+                        </a>
+                      </div>
+                      {doc.requiresAck && (
+                        <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <input
+                            type="checkbox"
+                            checked={documentAcks[doc.id] || false}
+                            onChange={(e) => handleDocumentAck(doc.id, e.target.checked)}
+                            className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            I have read and acknowledge this document
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -473,7 +558,7 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={submitting || !signature || !agreed || isOverdue}
+              disabled={submitting || !signature || !agreed || !allDocsAcknowledged || isOverdue}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 text-lg font-semibold text-white shadow-lg transition-all hover:from-blue-700 hover:to-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
               aria-busy={submitting}
             >
@@ -506,3 +591,4 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
     </div>
   );
 }
+

@@ -12,6 +12,44 @@ type FormField = {
   order: number;
 };
 
+type ReminderInterval = {
+  id: string;
+  value: number;
+  unit: 'days' | 'hours';
+};
+
+type FormDocument = {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number;
+  mimeType: string;
+  description: string;
+  source: string;
+  requiresAck: boolean;
+};
+
+// Preset reminder schedules
+const PRESET_SCHEDULES = {
+  standard: [
+    { value: 7, unit: 'days' as const },
+    { value: 3, unit: 'days' as const },
+    { value: 1, unit: 'days' as const },
+  ],
+  urgent: [
+    { value: 3, unit: 'days' as const },
+    { value: 1, unit: 'days' as const },
+    { value: 18, unit: 'hours' as const },
+  ],
+  thorough: [
+    { value: 7, unit: 'days' as const },
+    { value: 3, unit: 'days' as const },
+    { value: 2, unit: 'days' as const },
+    { value: 1, unit: 'days' as const },
+    { value: 18, unit: 'hours' as const },
+  ],
+};
+
 export default function CreateFormPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +65,16 @@ export default function CreateFormPage() {
   });
 
   const [fields, setFields] = useState<FormField[]>([]);
+
+  // Reminder settings
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [reminderIntervals, setReminderIntervals] = useState<ReminderInterval[]>(
+    PRESET_SCHEDULES.standard.map((r, i) => ({ ...r, id: `reminder-${i}` }))
+  );
+
+  // Document uploads
+  const [documents, setDocuments] = useState<FormDocument[]>([]);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -56,6 +104,96 @@ export default function CreateFormPage() {
     setFields(fields.filter((field) => field.id !== id));
   };
 
+  // Reminder helper functions
+  const addReminder = () => {
+    const newReminder: ReminderInterval = {
+      id: `reminder-${Date.now()}`,
+      value: 1,
+      unit: 'days',
+    };
+    setReminderIntervals([...reminderIntervals, newReminder]);
+  };
+
+  const updateReminder = (id: string, updates: Partial<ReminderInterval>) => {
+    setReminderIntervals(
+      reminderIntervals.map((r) => (r.id === id ? { ...r, ...updates } : r))
+    );
+  };
+
+  const removeReminder = (id: string) => {
+    setReminderIntervals(reminderIntervals.filter((r) => r.id !== id));
+  };
+
+  const applyPreset = (preset: keyof typeof PRESET_SCHEDULES) => {
+    setReminderIntervals(
+      PRESET_SCHEDULES[preset].map((r, i) => ({ ...r, id: `reminder-${i}` }))
+    );
+  };
+
+  // Document helper functions
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type (PDF only for now)
+    if (file.type !== 'application/pdf') {
+      setError('Only PDF files are allowed');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size must be less than 10MB');
+      return;
+    }
+
+    setIsUploadingDoc(true);
+    setError('');
+
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+
+      const response = await fetch('/api/upload/document', {
+        method: 'POST',
+        body: formDataUpload,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload document');
+      }
+
+      const newDoc: FormDocument = {
+        id: `doc-${Date.now()}`,
+        fileName: file.name,
+        fileUrl: data.url,
+        fileSize: file.size,
+        mimeType: file.type,
+        description: '',
+        source: 'external',
+        requiresAck: true,
+      };
+
+      setDocuments([...documents, newDoc]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload document');
+    } finally {
+      setIsUploadingDoc(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  const updateDocument = (id: string, updates: Partial<FormDocument>) => {
+    setDocuments(documents.map((d) => (d.id === id ? { ...d, ...updates } : d)));
+  };
+
+  const removeDocument = (id: string) => {
+    setDocuments(documents.filter((d) => d.id !== id));
+  };
+
   const handleSubmit = async (e: React.FormEvent, isDraft: boolean) => {
     e.preventDefault();
     setError('');
@@ -65,6 +203,23 @@ export default function CreateFormPage() {
       const eventDate = new Date(formData.eventDate).toISOString();
       const deadline = new Date(formData.deadline).toISOString();
 
+      // Format reminder schedule for API
+      const reminderSchedule = reminderIntervals.map((r) => ({
+        value: r.value,
+        unit: r.unit,
+      }));
+
+      // Format documents for API
+      const formDocuments = documents.map((d) => ({
+        fileName: d.fileName,
+        fileUrl: d.fileUrl,
+        fileSize: d.fileSize,
+        mimeType: d.mimeType,
+        description: d.description,
+        source: d.source,
+        requiresAck: d.requiresAck,
+      }));
+
       const response = await fetch('/api/forms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,6 +228,9 @@ export default function CreateFormPage() {
           eventDate,
           deadline,
           status: isDraft ? 'DRAFT' : 'ACTIVE',
+          remindersEnabled,
+          reminderSchedule,
+          documents: formDocuments,
           fields: fields.map((field) => ({
             fieldType: field.fieldType,
             label: field.label,
@@ -339,6 +497,250 @@ export default function CreateFormPage() {
                                 />
                               </svg>
                             </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Reminder Settings */}
+          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-6 py-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">Reminder Settings</h3>
+                <p className="text-sm text-gray-500">
+                  Configure automated reminders for parents who haven&apos;t signed
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={remindersEnabled}
+                  onChange={(e) => setRemindersEnabled(e.target.checked)}
+                  className="h-5 w-5 rounded border-gray-300 text-blue-600"
+                />
+                <span className="text-sm font-medium text-gray-700">Enable Reminders</span>
+              </label>
+            </div>
+
+            {remindersEnabled && (
+              <div className="p-6">
+                {/* Preset Buttons */}
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <span className="text-sm text-gray-600">Quick presets:</span>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('standard')}
+                    className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
+                  >
+                    Standard (7, 3, 1 days)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('urgent')}
+                    className="rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-200"
+                  >
+                    Urgent (3, 1 day, 18h)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('thorough')}
+                    className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-200"
+                  >
+                    Thorough (7, 3, 2, 1 day, 18h)
+                  </button>
+                </div>
+
+                {/* Reminder List */}
+                <div className="space-y-3">
+                  {reminderIntervals.map((reminder, index) => (
+                    <div
+                      key={reminder.id}
+                      className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
+                    >
+                      <span className="text-sm font-medium text-gray-500">#{index + 1}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={reminder.value}
+                        onChange={(e) =>
+                          updateReminder(reminder.id, { value: parseInt(e.target.value) || 1 })
+                        }
+                        className="w-20 rounded-lg border-2 border-gray-200 px-3 py-2 text-center text-gray-900 outline-none focus:border-blue-500"
+                      />
+                      <select
+                        value={reminder.unit}
+                        onChange={(e) =>
+                          updateReminder(reminder.id, { unit: e.target.value as 'days' | 'hours' })
+                        }
+                        className="rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500"
+                      >
+                        <option value="days">days before</option>
+                        <option value="hours">hours before</option>
+                      </select>
+                      <span className="text-sm text-gray-500">deadline</span>
+                      <button
+                        type="button"
+                        onClick={() => removeReminder(reminder.id)}
+                        className="ml-auto p-1 text-red-500 hover:text-red-700"
+                        disabled={reminderIntervals.length <= 1}
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addReminder}
+                  className="mt-4 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add another reminder
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* External Documents */}
+          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-6 py-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">External Documents</h3>
+                <p className="text-sm text-gray-500">
+                  Upload venue waivers, facility requirements, or other documents parents need to review
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+                {isUploadingDoc ? 'Uploading...' : 'Upload PDF'}
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleDocumentUpload}
+                  disabled={isUploadingDoc}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            <div className="p-6">
+              {documents.length === 0 ? (
+                <div className="py-8 text-center text-gray-500">
+                  <svg
+                    className="mx-auto h-12 w-12 text-gray-300"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <p className="mt-2">No external documents added yet.</p>
+                  <p className="text-sm">
+                    Upload PDFs that parents need to review and acknowledge (e.g., venue waivers).
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="rounded-lg bg-red-100 p-2">
+                          <svg
+                            className="h-6 w-6 text-red-600"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-gray-900">{doc.fileName}</p>
+                            <button
+                              type="button"
+                              onClick={() => removeDocument(doc.id)}
+                              className="p-1 text-red-500 hover:text-red-700"
+                            >
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                          <p className="text-sm text-gray-500">
+                            {(doc.fileSize / 1024).toFixed(1)} KB
+                          </p>
+                          <div className="mt-3 space-y-3">
+                            <input
+                              type="text"
+                              value={doc.description}
+                              onChange={(e) => updateDocument(doc.id, { description: e.target.value })}
+                              placeholder="Add a description (e.g., 'Zoo waiver form')"
+                              className="w-full rounded-lg border-2 border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+                            />
+                            <div className="flex items-center gap-4">
+                              <select
+                                value={doc.source}
+                                onChange={(e) => updateDocument(doc.id, { source: e.target.value })}
+                                className="rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+                              >
+                                <option value="external">External Venue</option>
+                                <option value="school">School Document</option>
+                                <option value="district">District Policy</option>
+                              </select>
+                              <label className="flex cursor-pointer items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={doc.requiresAck}
+                                  onChange={(e) =>
+                                    updateDocument(doc.id, { requiresAck: e.target.checked })
+                                  }
+                                  className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                                />
+                                <span className="text-sm text-gray-600">Require acknowledgment</span>
+                              </label>
+                            </div>
                           </div>
                         </div>
                       </div>

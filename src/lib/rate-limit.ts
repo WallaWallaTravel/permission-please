@@ -215,6 +215,9 @@ export const rateLimitPresets = {
   // Email sending (very strict)
   email: { max: 5, windowMs: 60000 },
 
+  // Magic link requests (strict to prevent email abuse)
+  magicLink: { max: 5, windowMs: 60000 },
+
   // Health checks (lenient)
   health: { max: 1000, windowMs: 60000 },
 };

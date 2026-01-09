@@ -7,6 +7,23 @@ export const formFieldSchema = z.object({
   order: z.number().int().positive(),
 });
 
+// Reminder interval schema
+export const reminderIntervalSchema = z.object({
+  value: z.number().int().positive().max(30, 'Reminder interval cannot exceed 30'),
+  unit: z.enum(['days', 'hours']),
+});
+
+// Form document schema
+export const formDocumentSchema = z.object({
+  fileName: z.string().min(1, 'File name is required'),
+  fileUrl: z.string().url('Invalid file URL'),
+  fileSize: z.number().int().positive(),
+  mimeType: z.string().min(1, 'MIME type is required'),
+  description: z.string().max(500, 'Description is too long').optional(),
+  source: z.enum(['external', 'school', 'district']).default('external'),
+  requiresAck: z.boolean().default(true),
+});
+
 export const createFormSchema = z
   .object({
     title: z.string().min(1, 'Title is required').max(200, 'Title is too long'),
@@ -16,6 +33,11 @@ export const createFormSchema = z
     deadline: z.string().datetime('Invalid deadline'),
     status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED']).default('DRAFT'),
     fields: z.array(formFieldSchema).optional(),
+    // Reminder settings
+    remindersEnabled: z.boolean().default(true),
+    reminderSchedule: z.array(reminderIntervalSchema).optional(),
+    // External documents
+    documents: z.array(formDocumentSchema).optional(),
   })
   .refine(
     (data) => {

@@ -36,3 +36,4 @@ describe('SignatureCanvas', () => {
     expect(canvas).toHaveStyle({ width: '300px', height: '150px' });
   });
 });
+

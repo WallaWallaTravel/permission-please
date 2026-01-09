@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 type RouteContext = {
   params: Promise<{ token: string }>;
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       },
     });
   } catch (error) {
-    console.error('Error validating invite:', error);
+    logger.error('Error validating invite', error as Error);
     return NextResponse.json({ error: 'Failed to validate invite' }, { status: 500 });
   }
 }

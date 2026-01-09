@@ -57,7 +57,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String
-  password  String
+  password  String?  // Optional - not used with Google OAuth / Magic Link
   role      Role
   schoolId  String?  @map("school_id")
   createdAt DateTime @default(now()) @map("created_at")
@@ -65,6 +65,7 @@ model User {
 
   // Relations
   school           School?             @relation(fields: [schoolId], references: [id])
+  accounts         Account[]           // OAuth accounts (Google, etc.)
   forms            PermissionForm[]    @relation("TeacherForms")
   parentStudents   ParentStudent[]
   formSubmissions  FormSubmission[]
@@ -73,6 +74,28 @@ model User {
 
   @@index([schoolId])
   @@map("users")
+}
+
+// OAuth Account model (required by NextAuth for OAuth providers)
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
 }
 
 model Student {
@@ -116,11 +139,18 @@ model PermissionForm {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
+  // Customizable reminder schedule (JSON array of intervals)
+  // Format: [{ "value": 7, "unit": "days" }, { "value": 18, "unit": "hours" }]
+  // Default: 7 days, 3 days, 1 day before deadline
+  reminderSchedule Json?   @default("[{\"value\":7,\"unit\":\"days\"},{\"value\":3,\"unit\":\"days\"},{\"value\":1,\"unit\":\"days\"}]") @map("reminder_schedule")
+  remindersEnabled Boolean @default(true) @map("reminders_enabled")
+
   // Relations
   school      School?          @relation(fields: [schoolId], references: [id])
   teacher     User             @relation("TeacherForms", fields: [teacherId], references: [id], onDelete: Cascade)
   fields      FormField[]
   submissions FormSubmission[]
+  documents   FormDocument[]
 
   @@index([teacherId, status])
   @@index([schoolId])
@@ -151,16 +181,18 @@ model FormSubmission {
   signatureData String           @map("signature_data") @db.Text
   signedAt      DateTime?        @map("signed_at")
   ipAddress     String?          @map("ip_address")
+  pdfUrl        String?          @map("pdf_url")
   status        SubmissionStatus @default(PENDING)
 
   // Relations
-  form      PermissionForm  @relation(fields: [formId], references: [id], onDelete: Cascade)
-  parent    User            @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  student   Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  responses FieldResponse[]
+  form       PermissionForm  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  parent     User            @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student    Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  responses  FieldResponse[]
 
   @@unique([formId, parentId, studentId])
   @@index([parentId])
+  @@index([studentId])
   @@index([formId, status])
   @@map("form_submissions")
 }
@@ -176,6 +208,7 @@ model FieldResponse {
   field      FormField      @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 
   @@index([submissionId])
+  @@index([fieldId])
   @@map("field_responses")
 }
 
@@ -218,15 +251,38 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-model PasswordResetToken {
-  id        String   @id @default(cuid())
+model MagicLinkToken {
+  id        String    @id @default(cuid())
   email     String
-  token     String   @unique
-  expiresAt DateTime @map("expires_at")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   @@index([token])
   @@index([email])
-  @@map("password_reset_tokens")
+  @@map("magic_link_tokens")
+}
+
+// External entity documents (e.g., field trip venue waivers, facility requirements)
+model FormDocument {
+  id          String   @id @default(cuid())
+  formId      String   @map("form_id")
+  fileName    String   @map("file_name")
+  fileUrl     String   @map("file_url")
+  fileSize    Int      @map("file_size")
+  mimeType    String   @map("mime_type")
+  description String?  @db.Text
+  // Source of the document (school, venue, etc.)
+  source      String   @default("school")
+  // Whether parent must acknowledge this document
+  requiresAck Boolean  @default(true) @map("requires_acknowledgment")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  form PermissionForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([formId])
+  @@map("form_documents")
 }

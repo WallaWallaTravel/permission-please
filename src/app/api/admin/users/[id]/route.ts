@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { z } from 'zod';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ user });
   } catch (error) {
-    console.error('Error fetching user:', error);
+    logger.error('Error fetching user', error as Error);
     return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
   }
 }
@@ -144,7 +145,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    console.error('Error updating user:', error);
+    logger.error('Error updating user', error as Error);
     return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
   }
 }
@@ -185,7 +186,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ message: 'User deleted successfully' });
   } catch (error) {
-    console.error('Error deleting user:', error);
+    logger.error('Error deleting user', error as Error);
     return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
   }
 }

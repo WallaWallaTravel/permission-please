@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { createFormSchema } from '@/lib/validations/form-schema';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 // GET /api/forms - List all forms for the current user
 export async function GET(request: Request) {
@@ -39,10 +41,14 @@ export async function GET(request: Request) {
             email: true,
           },
         },
+        documents: {
+          orderBy: { order: 'asc' },
+        },
         _count: {
           select: {
             submissions: true,
             fields: true,
+            documents: true,
           },
         },
       },
@@ -53,7 +59,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ forms });
   } catch (error) {
-    console.error('Error fetching forms:', error);
+    logger.error('Error fetching forms', error as Error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -75,21 +81,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
 
     // Validate input
     const validatedData = createFormSchema.parse(body);
 
-    // Create form with fields
+    // Format reminder schedule as JSON for storage
+    const reminderSchedule = validatedData.reminderSchedule
+      ? JSON.stringify(validatedData.reminderSchedule)
+      : undefined;
+
+    // Create form with fields, reminder settings, and documents
     const form = await prisma.permissionForm.create({
       data: {
         teacherId: user.id,
+        schoolId: user.schoolId || undefined,
         title: validatedData.title,
         description: validatedData.description,
         eventDate: new Date(validatedData.eventDate),
         eventType: validatedData.eventType,
         deadline: new Date(validatedData.deadline),
         status: validatedData.status,
+        remindersEnabled: validatedData.remindersEnabled ?? true,
+        reminderSchedule: reminderSchedule ? JSON.parse(reminderSchedule) : undefined,
         fields: validatedData.fields
           ? {
               create: validatedData.fields.map((field) => ({
@@ -100,9 +119,24 @@ export async function POST(request: Request) {
               })),
             }
           : undefined,
+        documents: validatedData.documents
+          ? {
+              create: validatedData.documents.map((doc, index) => ({
+                fileName: doc.fileName,
+                fileUrl: doc.fileUrl,
+                fileSize: doc.fileSize,
+                mimeType: doc.mimeType,
+                description: doc.description || null,
+                source: doc.source,
+                requiresAck: doc.requiresAck,
+                order: index,
+              })),
+            }
+          : undefined,
       },
       include: {
         fields: true,
+        documents: true,
         teacher: {
           select: {
             id: true,
@@ -121,15 +155,14 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    if (error && typeof error === 'object' && 'name' in error && error.name === 'ZodError') {
-      const zodError = error as unknown as { issues: unknown[] };
+    if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation error', details: zodError.issues },
+        { error: 'Validation error', details: error.issues },
         { status: 400 }
       );
     }
 
-    console.error('Error creating form:', error);
+    logger.error('Error creating form', error as Error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

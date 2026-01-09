@@ -17,8 +17,11 @@ export default async function StudentsPage() {
     redirect('/login');
   }
 
-  // Get all students with their parent relationships
+  // Get students filtered by school (multi-tenancy isolation)
+  const schoolFilter = user.schoolId ? { schoolId: user.schoolId } : {};
+
   const students = await prisma.student.findMany({
+    where: schoolFilter,
     include: {
       parents: {
         include: {
@@ -34,9 +37,12 @@ export default async function StudentsPage() {
     orderBy: { name: 'asc' },
   });
 
-  // Get all parents for linking
+  // Get parents filtered by school for linking
   const parents = await prisma.user.findMany({
-    where: { role: 'PARENT' },
+    where: {
+      role: 'PARENT',
+      ...(user.schoolId ? { schoolId: user.schoolId } : {}),
+    },
     select: { id: true, name: true, email: true },
     orderBy: { name: 'asc' },
   });
@@ -181,3 +187,4 @@ export default async function StudentsPage() {
     </div>
   );
 }
+

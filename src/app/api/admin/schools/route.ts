@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { z } from 'zod';
 import { applyRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 const createSchoolSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ schools });
   } catch (error) {
-    console.error('Error fetching schools:', error);
+    logger.error('Error fetching schools', error as Error);
     return NextResponse.json({ error: 'Failed to fetch schools' }, { status: 500 });
   }
 }
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('Error creating school:', error);
+    logger.error('Error creating school', error as Error);
     return NextResponse.json({ error: 'Failed to create school' }, { status: 500 });
   }
 }
