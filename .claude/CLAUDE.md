@@ -15,18 +15,26 @@ School permission slip management app with digital signing, reminders, and docum
 
 ## Known Issues & Solutions
 
-### Google OAuth 500 Error
+### Google OAuth 500 Error (Now Shows "DatabaseError")
 **Problem**: Users getting HTTP 500 when trying to sign in with Google.
 
-**Root Cause**: Database connection errors in auth callbacks were not being caught, causing unhandled exceptions.
+**Root Cause 1**: Database connection errors in auth callbacks were not being caught.
+**Solution 1**: Added try-catch blocks to the NextAuth callbacks in `src/lib/auth/config.ts`
 
-**Solution**: Added try-catch blocks to the NextAuth callbacks in `src/lib/auth/config.ts`:
-- `signIn` callback: Catches DB errors and redirects to `/login?error=DatabaseError`
-- `jwt` callback: Catches DB errors and continues with partial token (graceful degradation)
+**Root Cause 2**: Production DATABASE_URL pointed to wrong/deleted Supabase project.
+**Solution 2**: Updated Vercel environment variables with correct Supabase credentials:
+```bash
+# Correct Supabase project: djbonsnacfcwovqzjwcs (Permission Please)
+vercel env add DATABASE_URL production --force
+vercel env add DIRECT_URL production --force
+vercel --prod  # Redeploy to apply
+```
 
 **Files Changed**:
 - `src/lib/auth/config.ts` - Added error handling
 - `src/app/(auth)/login/page.tsx` - Added `DatabaseError` handling in the error display
+
+**Lesson Learned**: Always verify DATABASE_URL in Vercel matches the intended Supabase project. Use `vercel env pull` to check current values.
 
 ### ESLint react-hooks/purity Errors
 **Problem**: ESLint flags `Date.now()` and `window.location.href` in server components.
