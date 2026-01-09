@@ -24,7 +24,7 @@ fi
 
 # Pull production environment variables
 echo "Pulling production environment variables..."
-vercel env pull .env.verify --yes > /dev/null 2>&1
+vercel env pull .env.verify --environment=production --yes > /dev/null 2>&1
 
 if [ ! -f .env.verify ]; then
     echo -e "${RED}ERROR: Could not pull Vercel environment variables${NC}"
