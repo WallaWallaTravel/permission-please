@@ -44,6 +44,10 @@ export function EditStudentModal({ student, allParents }: EditStudentModalProps)
   const [showLinkParent, setShowLinkParent] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState('');
   const [relationship, setRelationship] = useState('parent');
+  // New guardian state
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [newGuardianName, setNewGuardianName] = useState('');
+  const [newGuardianEmail, setNewGuardianEmail] = useState('');
 
   const handleSave = async () => {
     setLoading(true);
@@ -71,20 +75,40 @@ export function EditStudentModal({ student, allParents }: EditStudentModalProps)
   };
 
   const handleLinkParent = async () => {
-    if (!selectedParentId) return;
+    // Validate based on mode
+    if (isCreatingNew) {
+      if (!newGuardianName.trim() || !newGuardianEmail.trim()) {
+        setError('Please enter both name and email for the new guardian');
+        return;
+      }
+    } else {
+      if (!selectedParentId) {
+        setError('Please select a parent');
+        return;
+      }
+    }
 
     setLoading(true);
     setError('');
 
     try {
+      const body = isCreatingNew
+        ? {
+            studentId: student.id,
+            parentName: newGuardianName.trim(),
+            parentEmail: newGuardianEmail.trim(),
+            relationship,
+          }
+        : {
+            studentId: student.id,
+            parentId: selectedParentId,
+            relationship,
+          };
+
       const res = await fetch('/api/students/link-parent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: student.id,
-          parentId: selectedParentId,
-          relationship,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -94,6 +118,9 @@ export function EditStudentModal({ student, allParents }: EditStudentModalProps)
 
       setShowLinkParent(false);
       setSelectedParentId('');
+      setNewGuardianName('');
+      setNewGuardianEmail('');
+      setIsCreatingNew(false);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -186,43 +213,111 @@ export function EditStudentModal({ student, allParents }: EditStudentModalProps)
 
               {/* Link New Parent */}
               {!showLinkParent ? (
-                availableParents.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowLinkParent(true)}
-                    className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    Link another parent
-                  </button>
-                )
+                <button
+                  type="button"
+                  onClick={() => setShowLinkParent(true)}
+                  className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Add parent/guardian
+                </button>
               ) : (
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                   <div className="space-y-3">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Select Parent
-                      </label>
-                      <select
-                        value={selectedParentId}
-                        onChange={(e) => setSelectedParentId(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
+                    {/* Toggle between existing and new */}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingNew(false)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                          !isCreatingNew
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                        }`}
                       >
-                        <option value="">Choose parent...</option>
-                        {availableParents.map((parent) => (
-                          <option key={parent.id} value={parent.id}>
-                            {parent.name} ({parent.email})
-                          </option>
-                        ))}
-                      </select>
+                        Link Existing
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingNew(true)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                          isCreatingNew
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        Create New
+                      </button>
                     </div>
+
+                    {isCreatingNew ? (
+                      <>
+                        {/* New guardian form */}
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-gray-700">
+                            Guardian Name
+                          </label>
+                          <input
+                            type="text"
+                            value={newGuardianName}
+                            onChange={(e) => setNewGuardianName(e.target.value)}
+                            placeholder="e.g., Sarah Johnson"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-gray-700">
+                            Guardian Email
+                          </label>
+                          <input
+                            type="email"
+                            value={newGuardianEmail}
+                            onChange={(e) => setNewGuardianEmail(e.target.value)}
+                            placeholder="e.g., sarah@email.com"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">
+                            They&apos;ll use this email to sign in and sign forms
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Existing parent dropdown */}
+                        {availableParents.length > 0 ? (
+                          <div>
+                            <label className="mb-1 block text-sm font-medium text-gray-700">
+                              Select Parent
+                            </label>
+                            <select
+                              value={selectedParentId}
+                              onChange={(e) => setSelectedParentId(e.target.value)}
+                              className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
+                            >
+                              <option value="">Choose parent...</option>
+                              {availableParents.map((parent) => (
+                                <option key={parent.id} value={parent.id}>
+                                  {parent.name} ({parent.email})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">
+                            No existing parents available. Use &quot;Create New&quot; to add a
+                            guardian.
+                          </p>
+                        )}
+                      </>
+                    )}
+
                     <div>
                       <label className="mb-1 block text-sm font-medium text-gray-700">
                         Relationship
@@ -242,7 +337,13 @@ export function EditStudentModal({ student, allParents }: EditStudentModalProps)
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => setShowLinkParent(false)}
+                        onClick={() => {
+                          setShowLinkParent(false);
+                          setIsCreatingNew(false);
+                          setNewGuardianName('');
+                          setNewGuardianEmail('');
+                          setSelectedParentId('');
+                        }}
                         className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
                       >
                         Cancel
@@ -250,10 +351,15 @@ export function EditStudentModal({ student, allParents }: EditStudentModalProps)
                       <button
                         type="button"
                         onClick={handleLinkParent}
-                        disabled={loading || !selectedParentId}
+                        disabled={
+                          loading ||
+                          (isCreatingNew
+                            ? !newGuardianName.trim() || !newGuardianEmail.trim()
+                            : !selectedParentId)
+                        }
                         className="flex-1 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
                       >
-                        {loading ? 'Linking...' : 'Link'}
+                        {loading ? 'Adding...' : isCreatingNew ? 'Create & Link' : 'Link'}
                       </button>
                     </div>
                   </div>

@@ -6,11 +6,21 @@ import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
 
-const linkParentSchema = z.object({
-  studentId: z.string().min(1, 'Student ID is required'),
-  parentId: z.string().min(1, 'Parent ID is required'),
-  relationship: z.enum(['parent', 'mother', 'father', 'guardian', 'grandparent']).default('parent'),
-});
+// Schema for linking existing parent OR creating new one
+const linkParentSchema = z
+  .object({
+    studentId: z.string().min(1, 'Student ID is required'),
+    // Either provide parentId (existing) OR parentName + parentEmail (new)
+    parentId: z.string().optional(),
+    parentName: z.string().min(1).max(100).optional(),
+    parentEmail: z.string().email().optional(),
+    relationship: z
+      .enum(['parent', 'mother', 'father', 'guardian', 'grandparent'])
+      .default('parent'),
+  })
+  .refine((data) => data.parentId || (data.parentName && data.parentEmail), {
+    message: 'Either parentId or both parentName and parentEmail are required',
+  });
 
 // POST /api/students/link-parent - Link a parent to a student
 export async function POST(request: NextRequest) {
@@ -32,7 +42,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = linkParentSchema.parse(body);
 
-    // Verify the student exists
+    // Verify the student exists and get school context
     const student = await prisma.student.findUnique({
       where: { id: validatedData.studentId },
     });
@@ -41,24 +51,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // Verify the parent exists and is a parent role
-    const parent = await prisma.user.findUnique({
-      where: { id: validatedData.parentId },
-    });
+    let parentId: string;
+    let isNewParent = false;
 
-    if (!parent) {
-      return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+    // Case 1: Link existing parent
+    if (validatedData.parentId) {
+      const parent = await prisma.user.findUnique({
+        where: { id: validatedData.parentId },
+      });
+
+      if (!parent) {
+        return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+      }
+
+      if (parent.role !== 'PARENT') {
+        return NextResponse.json({ error: 'User is not a parent' }, { status: 400 });
+      }
+
+      parentId = parent.id;
     }
+    // Case 2: Create new parent/guardian
+    else if (validatedData.parentName && validatedData.parentEmail) {
+      const email = validatedData.parentEmail.toLowerCase();
 
-    if (parent.role !== 'PARENT') {
-      return NextResponse.json({ error: 'User is not a parent' }, { status: 400 });
+      // Check if user already exists with this email
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (existingUser) {
+        if (existingUser.role !== 'PARENT') {
+          return NextResponse.json(
+            { error: 'A user with this email exists but is not a parent account' },
+            { status: 400 }
+          );
+        }
+        // Use existing parent account
+        parentId = existingUser.id;
+      } else {
+        // Create new parent account
+        const newParent = await prisma.user.create({
+          data: {
+            email,
+            name: validatedData.parentName,
+            role: 'PARENT',
+            schoolId: student.schoolId,
+          },
+        });
+        parentId = newParent.id;
+        isNewParent = true;
+      }
+    } else {
+      return NextResponse.json(
+        { error: 'Either parentId or both parentName and parentEmail are required' },
+        { status: 400 }
+      );
     }
 
     // Check if link already exists
     const existingLink = await prisma.parentStudent.findUnique({
       where: {
         parentId_studentId: {
-          parentId: validatedData.parentId,
+          parentId,
           studentId: validatedData.studentId,
         },
       },
@@ -70,7 +124,7 @@ export async function POST(request: NextRequest) {
         const updatedLink = await prisma.parentStudent.update({
           where: {
             parentId_studentId: {
-              parentId: validatedData.parentId,
+              parentId,
               studentId: validatedData.studentId,
             },
           },
@@ -94,22 +148,26 @@ export async function POST(request: NextRequest) {
     // Create the parent-student link
     const link = await prisma.parentStudent.create({
       data: {
-        parentId: validatedData.parentId,
+        parentId,
         studentId: validatedData.studentId,
         relationship: validatedData.relationship,
       },
     });
 
     logger.info('Parent linked to student', {
-      parentId: validatedData.parentId,
+      parentId,
       studentId: validatedData.studentId,
       relationship: validatedData.relationship,
       linkedBy: session.user.id,
+      isNewParent,
     });
 
     return NextResponse.json({
-      message: 'Parent linked to student successfully',
+      message: isNewParent
+        ? 'New guardian created and linked to student successfully'
+        : 'Parent linked to student successfully',
       link,
+      isNewParent,
     });
   } catch (error) {
     if (error && typeof error === 'object' && 'name' in error && error.name === 'ZodError') {
