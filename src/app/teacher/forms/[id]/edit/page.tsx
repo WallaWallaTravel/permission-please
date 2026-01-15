@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -27,6 +27,7 @@ type FormDocument = {
   description: string;
   source: string;
   requiresAck: boolean;
+  isExisting?: boolean;
 };
 
 // Preset reminder schedules
@@ -50,9 +51,11 @@ const PRESET_SCHEDULES = {
   ],
 };
 
-export default function CreateFormPage() {
+export default function EditFormPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
@@ -61,7 +64,7 @@ export default function CreateFormPage() {
     eventDate: '',
     eventType: 'FIELD_TRIP' as const,
     deadline: '',
-    status: 'DRAFT' as const,
+    status: 'DRAFT' as 'DRAFT' | 'ACTIVE' | 'CLOSED',
   });
 
   const [fields, setFields] = useState<FormField[]>([]);
@@ -75,6 +78,90 @@ export default function CreateFormPage() {
   // Document uploads
   const [documents, setDocuments] = useState<FormDocument[]>([]);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+
+  // Load existing form data
+  useEffect(() => {
+    async function loadForm() {
+      try {
+        const res = await fetch(`/api/forms/${id}`);
+        if (!res.ok) {
+          if (res.status === 401) {
+            router.push('/login');
+            return;
+          }
+          throw new Error('Failed to load form');
+        }
+        const data = await res.json();
+        const form = data.form;
+
+        // Format dates for datetime-local input
+        const eventDate = new Date(form.eventDate);
+        const deadline = new Date(form.deadline);
+        const formatDateForInput = (date: Date) => {
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        };
+
+        setFormData({
+          title: form.title,
+          description: form.description,
+          eventDate: formatDateForInput(eventDate),
+          eventType: form.eventType,
+          deadline: formatDateForInput(deadline),
+          status: form.status,
+        });
+
+        // Load fields
+        if (form.fields && form.fields.length > 0) {
+          setFields(
+            form.fields.map((f: FormField) => ({
+              id: f.id,
+              fieldType: f.fieldType,
+              label: f.label,
+              required: f.required,
+              order: f.order,
+            }))
+          );
+        }
+
+        // Load reminder schedule if present
+        if (form.reminderSchedule) {
+          try {
+            const schedule =
+              typeof form.reminderSchedule === 'string'
+                ? JSON.parse(form.reminderSchedule)
+                : form.reminderSchedule;
+            if (Array.isArray(schedule) && schedule.length > 0) {
+              setReminderIntervals(
+                schedule.map((r: { value: number; unit: 'days' | 'hours' }, i: number) => ({
+                  ...r,
+                  id: `reminder-${i}`,
+                }))
+              );
+            }
+          } catch {
+            // Keep default reminders if parsing fails
+          }
+        }
+        setRemindersEnabled(form.remindersEnabled !== false);
+
+        // Load existing documents
+        if (form.documents && form.documents.length > 0) {
+          setDocuments(
+            form.documents.map((d: FormDocument) => ({
+              ...d,
+              isExisting: true,
+            }))
+          );
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load form');
+      } finally {
+        setIsFetching(false);
+      }
+    }
+    loadForm();
+  }, [id, router]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -96,12 +183,12 @@ export default function CreateFormPage() {
     setFields([...fields, newField]);
   };
 
-  const updateField = (id: string, updates: Partial<FormField>) => {
-    setFields(fields.map((field) => (field.id === id ? { ...field, ...updates } : field)));
+  const updateField = (fieldId: string, updates: Partial<FormField>) => {
+    setFields(fields.map((field) => (field.id === fieldId ? { ...field, ...updates } : field)));
   };
 
-  const removeField = (id: string) => {
-    setFields(fields.filter((field) => field.id !== id));
+  const removeField = (fieldId: string) => {
+    setFields(fields.filter((field) => field.id !== fieldId));
   };
 
   // Reminder helper functions
@@ -114,12 +201,14 @@ export default function CreateFormPage() {
     setReminderIntervals([...reminderIntervals, newReminder]);
   };
 
-  const updateReminder = (id: string, updates: Partial<ReminderInterval>) => {
-    setReminderIntervals(reminderIntervals.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+  const updateReminder = (reminderId: string, updates: Partial<ReminderInterval>) => {
+    setReminderIntervals(
+      reminderIntervals.map((r) => (r.id === reminderId ? { ...r, ...updates } : r))
+    );
   };
 
-  const removeReminder = (id: string) => {
-    setReminderIntervals(reminderIntervals.filter((r) => r.id !== id));
+  const removeReminder = (reminderId: string) => {
+    setReminderIntervals(reminderIntervals.filter((r) => r.id !== reminderId));
   };
 
   const applyPreset = (preset: keyof typeof PRESET_SCHEDULES) => {
@@ -131,13 +220,11 @@ export default function CreateFormPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type (PDF only for now)
     if (file.type !== 'application/pdf') {
       setError('Only PDF files are allowed');
       return;
     }
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       setError('File size must be less than 10MB');
       return;
@@ -177,20 +264,19 @@ export default function CreateFormPage() {
       setError(err instanceof Error ? err.message : 'Failed to upload document');
     } finally {
       setIsUploadingDoc(false);
-      // Reset file input
       e.target.value = '';
     }
   };
 
-  const updateDocument = (id: string, updates: Partial<FormDocument>) => {
-    setDocuments(documents.map((d) => (d.id === id ? { ...d, ...updates } : d)));
+  const updateDocument = (docId: string, updates: Partial<FormDocument>) => {
+    setDocuments(documents.map((d) => (d.id === docId ? { ...d, ...updates } : d)));
   };
 
-  const removeDocument = (id: string) => {
-    setDocuments(documents.filter((d) => d.id !== id));
+  const removeDocument = (docId: string) => {
+    setDocuments(documents.filter((d) => d.id !== docId));
   };
 
-  const handleSubmit = async (e: React.FormEvent, isDraft: boolean) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -234,34 +320,41 @@ export default function CreateFormPage() {
         unit: r.unit,
       }));
 
-      // Format documents for API
-      const formDocuments = documents.map((d) => ({
-        fileName: d.fileName,
-        fileUrl: d.fileUrl,
-        fileSize: d.fileSize,
-        mimeType: d.mimeType,
-        description: d.description,
-        source: d.source,
-        requiresAck: d.requiresAck,
+      // Format new documents for API (only send non-existing docs)
+      const newDocs = documents
+        .filter((d) => !d.isExisting)
+        .map((d) => ({
+          fileName: d.fileName,
+          fileUrl: d.fileUrl,
+          fileSize: d.fileSize,
+          mimeType: d.mimeType,
+          description: d.description,
+          source: d.source,
+          requiresAck: d.requiresAck,
+        }));
+
+      // Format fields for API (remove temp IDs for new fields)
+      const formattedFields = fields.map((f, index) => ({
+        id: f.id.startsWith('field-') ? undefined : f.id, // Only include real IDs
+        fieldType: f.fieldType,
+        label: f.label,
+        required: f.required,
+        order: index + 1,
       }));
 
-      const response = await fetch('/api/forms', {
-        method: 'POST',
+      const response = await fetch(`/api/forms/${id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          title: formData.title,
+          description: formData.description,
           eventDate,
           deadline,
-          status: isDraft ? 'DRAFT' : 'ACTIVE',
+          eventType: formData.eventType,
           remindersEnabled,
           reminderSchedule,
-          documents: formDocuments,
-          fields: fields.map((field) => ({
-            fieldType: field.fieldType,
-            label: field.label,
-            required: field.required,
-            order: field.order,
-          })),
+          fields: formattedFields,
+          ...(newDocs.length > 0 && { documents: newDocs }),
         }),
       });
 
@@ -273,7 +366,6 @@ export default function CreateFormPage() {
           const messages = data.details.map((issue: { path?: string[]; message?: string }) => {
             const field = issue.path?.join('.') || 'form';
             const message = issue.message || 'Invalid value';
-            // Map field names to user-friendly labels
             const fieldLabels: Record<string, string> = {
               title: 'Title',
               description: 'Description',
@@ -286,10 +378,10 @@ export default function CreateFormPage() {
           });
           throw new Error(messages.join('\n'));
         }
-        throw new Error(data.error || 'Failed to create form');
+        throw new Error(data.error || 'Failed to update form');
       }
 
-      router.push('/teacher/dashboard');
+      router.push(`/teacher/forms/${id}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -298,13 +390,24 @@ export default function CreateFormPage() {
     }
   };
 
+  if (isFetching) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-indigo-50">
+        <div className="flex animate-pulse flex-col items-center gap-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <p className="text-gray-600">Loading form...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
           <Link
-            href="/teacher/dashboard"
+            href={`/teacher/forms/${id}`}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -315,7 +418,7 @@ export default function CreateFormPage() {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back to Dashboard
+            Back to Form
           </Link>
           <h1 className="font-bold text-gray-900">Permission Please 📝</h1>
           <div className="w-32" />
@@ -324,11 +427,19 @@ export default function CreateFormPage() {
 
       <main className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Create Permission Form</h2>
-          <p className="mt-1 text-gray-600">Fill out the details for your new permission slip</p>
+          <h2 className="text-3xl font-bold text-gray-900">Edit Permission Form</h2>
+          <p className="mt-1 text-gray-600">Update the details for this permission slip</p>
+          {formData.status !== 'DRAFT' && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm text-amber-800">
+                <strong>Note:</strong> This form is {formData.status.toLowerCase()}. Some changes
+                may affect parents who have already received or signed it.
+              </p>
+            </div>
+          )}
         </div>
 
-        <form className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-4">
               <div className="flex gap-3">
@@ -744,7 +855,7 @@ export default function CreateFormPage() {
                   </svg>
                   <p className="mt-2">No external documents added yet.</p>
                   <p className="text-sm">
-                    Upload PDFs that parents need to review and acknowledge (e.g., venue waivers).
+                    Upload PDFs that parents need to review and acknowledge.
                   </p>
                 </div>
               ) : (
@@ -769,65 +880,52 @@ export default function CreateFormPage() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="font-medium text-gray-900">{doc.fileName}</p>
-                            <button
-                              type="button"
-                              onClick={() => removeDocument(doc.id)}
-                              className="p-1 text-red-500 hover:text-red-700"
-                            >
-                              <svg
-                                className="h-5 w-5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-gray-900">{doc.fileName}</p>
+                              {doc.isExisting && (
+                                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
+                                  Saved
+                                </span>
+                              )}
+                            </div>
+                            {!doc.isExisting && (
+                              <button
+                                type="button"
+                                onClick={() => removeDocument(doc.id)}
+                                className="p-1 text-red-500 hover:text-red-700"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
-                            </button>
+                                <svg
+                                  className="h-5 w-5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                  />
+                                </svg>
+                              </button>
+                            )}
                           </div>
                           <p className="text-sm text-gray-500">
                             {(doc.fileSize / 1024).toFixed(1)} KB
                           </p>
-                          <div className="mt-3 space-y-3">
-                            <input
-                              type="text"
-                              value={doc.description}
-                              onChange={(e) =>
-                                updateDocument(doc.id, { description: e.target.value })
-                              }
-                              placeholder="Add a description (e.g., 'Zoo waiver form')"
-                              className="w-full rounded-lg border-2 border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
-                            />
-                            <div className="flex items-center gap-4">
-                              <select
-                                value={doc.source}
-                                onChange={(e) => updateDocument(doc.id, { source: e.target.value })}
-                                className="rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
-                              >
-                                <option value="external">External Venue</option>
-                                <option value="school">School Document</option>
-                                <option value="district">District Policy</option>
-                              </select>
-                              <label className="flex cursor-pointer items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={doc.requiresAck}
-                                  onChange={(e) =>
-                                    updateDocument(doc.id, { requiresAck: e.target.checked })
-                                  }
-                                  className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                                />
-                                <span className="text-sm text-gray-600">
-                                  Require acknowledgment
-                                </span>
-                              </label>
+                          {!doc.isExisting && (
+                            <div className="mt-3 space-y-3">
+                              <input
+                                type="text"
+                                value={doc.description}
+                                onChange={(e) =>
+                                  updateDocument(doc.id, { description: e.target.value })
+                                }
+                                placeholder="Add a description (e.g., 'Zoo waiver form')"
+                                className="w-full rounded-lg border-2 border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+                              />
                             </div>
-                          </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -840,26 +938,17 @@ export default function CreateFormPage() {
           {/* Actions */}
           <div className="flex flex-col justify-end gap-3 pt-4 sm:flex-row">
             <Link
-              href="/teacher/dashboard"
+              href={`/teacher/forms/${id}`}
               className="rounded-xl border-2 border-gray-200 px-6 py-3 text-center font-medium text-gray-700 transition hover:bg-gray-50"
             >
               Cancel
             </Link>
             <button
-              type="button"
-              onClick={(e) => handleSubmit(e, true)}
-              disabled={isLoading}
-              className="rounded-xl bg-gray-600 px-6 py-3 font-medium text-white transition hover:bg-gray-700 disabled:opacity-50"
-            >
-              Save as Draft
-            </button>
-            <button
-              type="button"
-              onClick={(e) => handleSubmit(e, false)}
+              type="submit"
               disabled={isLoading}
               className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/25 transition hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50"
             >
-              {isLoading ? 'Creating...' : 'Create & Activate'}
+              {isLoading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

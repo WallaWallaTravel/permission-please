@@ -236,6 +236,7 @@ describe('GET /api/forms/[id]', () => {
 
     const form = mockDataFactory.permissionForm({ teacherId: 'other-teacher-id' });
     mockPrismaClient.permissionForm.findUnique.mockResolvedValue(form);
+    mockPrismaClient.formShare.findUnique.mockResolvedValue(null); // No share access
 
     const request = new Request('http://localhost:6001/api/forms/form-123');
     const response = await GET(request, { params: Promise.resolve({ id: 'form-123' }) });

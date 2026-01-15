@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, Loader2, Search } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Users, Loader2, Search, Trash2 } from 'lucide-react';
 
 interface User {
   id: string;
@@ -35,12 +36,14 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 export default function UsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -109,6 +112,31 @@ export default function UsersPage() {
       console.error('Error updating user:', error);
     } finally {
       setUpdatingUserId(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`Are you sure you want to delete "${userName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingUserId(userId);
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setUsers((prev) => prev.filter((u) => u.id !== userId));
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Failed to delete user');
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -195,6 +223,9 @@ export default function UsersPage() {
                 <th className="px-6 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase">
                   Joined
                 </th>
+                <th className="px-6 py-3 text-center text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -238,7 +269,16 @@ export default function UsersPage() {
                   </td>
                   <td className="px-6 py-4 text-center text-sm text-gray-500">
                     {user.role === 'TEACHER' || user.role === 'ADMIN' ? (
-                      <span>{user._count.forms} forms</span>
+                      user._count.forms > 0 ? (
+                        <button
+                          onClick={() => router.push(`/admin/users/${user.id}/forms`)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {user._count.forms} forms
+                        </button>
+                      ) : (
+                        <span>0 forms</span>
+                      )
                     ) : user.role === 'PARENT' ? (
                       <span>{user._count.formSubmissions} signatures</span>
                     ) : (
@@ -247,6 +287,20 @@ export default function UsersPage() {
                   </td>
                   <td className="px-6 py-4 text-right text-sm text-gray-500">
                     {new Date(user.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => handleDeleteUser(user.id, user.name)}
+                      disabled={deletingUserId === user.id}
+                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      title="Delete user"
+                    >
+                      {deletingUserId === user.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </button>
                   </td>
                 </tr>
               ))}

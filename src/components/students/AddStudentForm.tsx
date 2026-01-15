@@ -7,6 +7,8 @@ export function AddStudentForm() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [grade, setGrade] = useState('');
+  const [parentName, setParentName] = useState('');
+  const [parentEmail, setParentEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -21,7 +23,12 @@ export function AddStudentForm() {
       const res = await fetch('/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, grade }),
+        body: JSON.stringify({
+          name,
+          grade,
+          parentName,
+          parentEmail,
+        }),
       });
 
       if (!res.ok) {
@@ -32,6 +39,8 @@ export function AddStudentForm() {
       setSuccess(true);
       setName('');
       setGrade('');
+      setParentName('');
+      setParentEmail('');
       router.refresh();
 
       // Clear success message after 3 seconds
@@ -45,6 +54,11 @@ export function AddStudentForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Student Info Section */}
+      <div className="mb-2">
+        <p className="text-sm font-medium text-gray-700">Student Information</p>
+      </div>
+
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Student Name</label>
         <input
@@ -82,11 +96,46 @@ export function AddStudentForm() {
         </select>
       </div>
 
+      {/* Parent Info Section */}
+      <div className="mt-6 border-t border-gray-200 pt-4">
+        <p className="mb-2 text-sm font-medium text-gray-700">Parent/Guardian Information</p>
+        <p className="mb-3 text-xs text-gray-500">
+          Required so they can receive and sign permission forms
+        </p>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Parent Name</label>
+        <input
+          type="text"
+          value={parentName}
+          onChange={(e) => setParentName(e.target.value)}
+          required
+          placeholder="e.g., Sarah Johnson"
+          className="w-full rounded-lg border border-gray-300 px-4 py-2 transition outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Parent Email</label>
+        <input
+          type="email"
+          value={parentEmail}
+          onChange={(e) => setParentEmail(e.target.value)}
+          required
+          placeholder="e.g., sarah.johnson@email.com"
+          className="w-full rounded-lg border border-gray-300 px-4 py-2 transition outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          They&apos;ll use this email to sign in and sign forms
+        </p>
+      </div>
+
       {error && <div className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
 
       {success && (
         <div className="rounded-lg bg-green-50 px-4 py-2 text-sm text-green-700">
-          ✓ Student added successfully!
+          Student and parent added successfully!
         </div>
       )}
 
@@ -95,9 +144,8 @@ export function AddStudentForm() {
         disabled={loading}
         className="w-full rounded-lg bg-purple-600 py-2 font-medium text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading ? 'Adding...' : 'Add Student'}
+        {loading ? 'Adding...' : 'Add Student & Parent'}
       </button>
     </form>
   );
 }
-

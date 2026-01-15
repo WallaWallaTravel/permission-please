@@ -24,34 +24,50 @@ export const formDocumentSchema = z.object({
   requiresAck: z.boolean().default(true),
 });
 
-export const createFormSchema = z
-  .object({
-    title: z.string().min(1, 'Title is required').max(200, 'Title is too long'),
-    description: z.string().min(1, 'Description is required').max(2000, 'Description is too long'),
-    eventDate: z.string().datetime('Invalid event date'),
-    eventType: z.enum(['FIELD_TRIP', 'SPORTS', 'ACTIVITY', 'OTHER']),
-    deadline: z.string().datetime('Invalid deadline'),
-    status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED']).default('DRAFT'),
-    fields: z.array(formFieldSchema).optional(),
-    // Reminder settings
-    remindersEnabled: z.boolean().default(true),
-    reminderSchedule: z.array(reminderIntervalSchema).optional(),
-    // External documents
-    documents: z.array(formDocumentSchema).optional(),
-  })
-  .refine(
-    (data) => {
+// Base schema without refinement
+const baseFormSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200, 'Title is too long'),
+  description: z.string().min(1, 'Description is required').max(2000, 'Description is too long'),
+  eventDate: z.string().datetime('Invalid event date'),
+  eventType: z.enum(['FIELD_TRIP', 'SPORTS', 'ACTIVITY', 'OTHER']),
+  deadline: z.string().datetime('Invalid deadline'),
+  status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED']).default('DRAFT'),
+  fields: z.array(formFieldSchema).optional(),
+  // Reminder settings
+  remindersEnabled: z.boolean().default(true),
+  reminderSchedule: z.array(reminderIntervalSchema).optional(),
+  // External documents
+  documents: z.array(formDocumentSchema).optional(),
+});
+
+export const createFormSchema = baseFormSchema.refine(
+  (data) => {
+    const eventDate = new Date(data.eventDate);
+    const deadline = new Date(data.deadline);
+    return deadline < eventDate;
+  },
+  {
+    message: 'Deadline must be before the event date',
+    path: ['deadline'],
+  }
+);
+
+// Update schema is partial and only validates deadline if both dates provided
+export const updateFormSchema = baseFormSchema.partial().refine(
+  (data) => {
+    // Only validate if both dates are provided
+    if (data.eventDate && data.deadline) {
       const eventDate = new Date(data.eventDate);
       const deadline = new Date(data.deadline);
       return deadline < eventDate;
-    },
-    {
-      message: 'Deadline must be before the event date',
-      path: ['deadline'],
     }
-  );
-
-export const updateFormSchema = createFormSchema.partial();
+    return true;
+  },
+  {
+    message: 'Deadline must be before the event date',
+    path: ['deadline'],
+  }
+);
 
 export type CreateFormInput = z.infer<typeof createFormSchema>;
 export type UpdateFormInput = z.infer<typeof updateFormSchema>;

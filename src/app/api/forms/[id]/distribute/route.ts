@@ -20,6 +20,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { id } = await params;
 
+    // Parse optional groupIds from request body
+    let groupIds: string[] | undefined;
+    try {
+      const body = await request.json();
+      groupIds = body.groupIds;
+    } catch {
+      // No body or invalid JSON - that's fine, send to all
+    }
+
     // Verify form exists and belongs to teacher, include school for filtering
     const form = await prisma.permissionForm.findUnique({
       where: { id },
@@ -50,9 +59,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // Get students filtered by school (if form has school context)
       const schoolFilter = form.schoolId ? { schoolId: form.schoolId } : {};
 
+      // If groupIds provided, filter to only students in those groups
+      let groupMemberFilter = {};
+      if (groupIds && groupIds.length > 0) {
+        groupMemberFilter = {
+          groups: {
+            some: {
+              groupId: { in: groupIds },
+            },
+          },
+        };
+      }
+
       const students = await tx.student.findMany({
         where: {
           ...schoolFilter,
+          ...groupMemberFilter,
           parents: { some: {} }, // Only students with at least one parent
         },
         include: {
@@ -67,7 +89,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
 
       if (students.length === 0) {
-        throw new Error('NO_STUDENTS');
+        // Check if there are students without parents vs no students at all
+        const allStudentsCount = await tx.student.count({
+          where: schoolFilter,
+        });
+        if (allStudentsCount === 0) {
+          throw new Error('NO_STUDENTS_IN_SCHOOL');
+        } else {
+          throw new Error('NO_STUDENTS_WITH_PARENTS');
+        }
       }
 
       // Collect all parent-student pairs for batch submission creation
@@ -134,11 +164,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Only send emails if Resend is configured
     if (process.env.RESEND_API_KEY) {
       // Group by parent email, collecting student names
-      const parentEmails = new Map<string, {
-        email: string;
-        name: string;
-        studentNames: string[];
-      }>();
+      const parentEmails = new Map<
+        string,
+        {
+          email: string;
+          name: string;
+          studentNames: string[];
+        }
+      >();
 
       for (const data of result.submissionData) {
         const existing = parentEmails.get(data.parentEmail);
@@ -200,11 +233,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === 'NO_STUDENTS') {
-      return NextResponse.json({ error: 'No students with linked parents found' }, { status: 400 });
+    if (error instanceof Error) {
+      if (error.message === 'NO_STUDENTS_IN_SCHOOL') {
+        return NextResponse.json(
+          {
+            error: 'No students found. Add students first at Students page.',
+            code: 'NO_STUDENTS',
+            actionUrl: '/teacher/students',
+          },
+          { status: 400 }
+        );
+      }
+      if (error.message === 'NO_STUDENTS_WITH_PARENTS') {
+        return NextResponse.json(
+          {
+            error:
+              'Students exist but no parents are linked yet. Link parents to students at Students page.',
+            code: 'NO_PARENT_LINKS',
+            actionUrl: '/teacher/students',
+          },
+          { status: 400 }
+        );
+      }
     }
     logger.error('Error distributing form', error as Error);
     return NextResponse.json({ error: 'Failed to distribute form' }, { status: 500 });
   }
 }
-

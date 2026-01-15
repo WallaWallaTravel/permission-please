@@ -24,9 +24,13 @@ function LoginForm() {
   // Handle errors from OAuth redirect
   useEffect(() => {
     if (urlError === 'NoAccount') {
-      setError('No account found for this email. Please contact your school administrator to get an invite.');
+      setError(
+        'No account found for this email. Please contact your school administrator to get an invite.'
+      );
     } else if (urlError === 'OAuthAccountNotLinked') {
-      setError('This email is already associated with another sign-in method. Try using a magic link instead.');
+      setError(
+        'This email is already associated with another sign-in method. Try using a magic link instead.'
+      );
       setLoginMode('magic-link');
     } else if (urlError === 'DatabaseError') {
       setError('Unable to connect to the database. Please try again in a few moments.');
@@ -38,18 +42,29 @@ function LoginForm() {
   // Redirect if already authenticated
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
-      const destination =
-        callbackUrl ||
-        (session.user.role === 'PARENT' ? '/parent/dashboard' : '/teacher/dashboard');
-      router.push(destination);
+      if (callbackUrl) {
+        router.push(callbackUrl);
+        return;
+      }
+      // Route based on role
+      const role = session.user.role;
+      if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+        router.push('/admin/dashboard');
+      } else if (role === 'PARENT') {
+        router.push('/parent/dashboard');
+      } else {
+        router.push('/teacher/dashboard');
+      }
     }
   }, [status, session, router, callbackUrl]);
 
   const handleGoogleLogin = () => {
     setError('');
     setIsLoading(true);
+    // Don't specify callbackUrl - NextAuth will redirect back to /login
+    // and the useEffect above will route based on role
     signIn('google', {
-      callbackUrl: callbackUrl || '/teacher/dashboard',
+      callbackUrl: callbackUrl || '/login',
     });
   };
 
@@ -71,7 +86,9 @@ function LoginForm() {
       if (!response.ok) {
         setError(data.error || 'Failed to send magic link');
       } else {
-        setSuccess('Check your email! If you have an account, you will receive a login link shortly.');
+        setSuccess(
+          'Check your email! If you have an account, you will receive a login link shortly.'
+        );
         setEmail('');
       }
     } catch {
@@ -206,14 +223,16 @@ function LoginForm() {
                 </button>
 
                 <p className="text-center text-xs text-slate-500">
-                  Your school may use Google Workspace. Use your school Google account if you have one.
+                  Your school may use Google Workspace. Use your school Google account if you have
+                  one.
                 </p>
               </div>
             ) : (
               <form onSubmit={handleMagicLink} className="space-y-6">
                 <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
                   <p className="text-sm text-blue-700">
-                    <strong>Alternative login:</strong> Enter your email to receive a secure login link. No password needed!
+                    <strong>Alternative login:</strong> Enter your email to receive a secure login
+                    link. No password needed!
                   </p>
                 </div>
 

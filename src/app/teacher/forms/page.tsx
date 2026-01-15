@@ -22,10 +22,10 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
     redirect('/login');
   }
 
-  // Fetch all forms for this teacher with optional status filter
+  // Fetch all forms owned by this teacher OR shared with them
   const forms = await prisma.permissionForm.findMany({
     where: {
-      teacherId: user.id,
+      OR: [{ teacherId: user.id }, { shares: { some: { userId: user.id } } }],
       ...(status && status !== 'ALL' ? { status: status as 'DRAFT' | 'ACTIVE' | 'CLOSED' } : {}),
     },
     include: {
@@ -35,14 +35,23 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
       submissions: {
         select: { status: true },
       },
+      teacher: {
+        select: { id: true, name: true },
+      },
+      shares: {
+        where: { userId: user.id },
+        select: { canEdit: true },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
 
-  // Count by status for filters
+  // Count by status for filters (include shared forms)
   const statusCounts = await prisma.permissionForm.groupBy({
     by: ['status'],
-    where: { teacherId: user.id },
+    where: {
+      OR: [{ teacherId: user.id }, { shares: { some: { userId: user.id } } }],
+    },
     _count: true,
   });
 
@@ -84,6 +93,12 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
                 >
                   Students
                 </Link>
+                <Link
+                  href="/teacher/groups"
+                  className="rounded-lg px-4 py-2 text-gray-600 transition hover:bg-gray-50"
+                >
+                  Groups
+                </Link>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -123,7 +138,7 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
             <Link
               key={filterStatus}
               href={`/teacher/forms${filterStatus === 'ALL' ? '' : `?status=${filterStatus}`}`}
-              className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition ${
                 currentFilter === filterStatus
                   ? filterStatus === 'DRAFT'
                     ? 'bg-gray-100 text-gray-700'
@@ -141,9 +156,7 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
               {filterStatus === 'CLOSED' && 'Closed'}
               <span
                 className={`rounded-full px-2 py-0.5 text-xs ${
-                  currentFilter === filterStatus
-                    ? 'bg-white/50'
-                    : 'bg-gray-100 text-gray-600'
+                  currentFilter === filterStatus ? 'bg-white/50' : 'bg-gray-100 text-gray-600'
                 }`}
               >
                 {counts[filterStatus]}
@@ -157,7 +170,13 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
           {forms.length === 0 ? (
             <div className="p-12 text-center">
               <div className="mb-4 text-5xl">
-                {currentFilter === 'ALL' ? '📝' : currentFilter === 'DRAFT' ? '📋' : currentFilter === 'ACTIVE' ? '✅' : '🔒'}
+                {currentFilter === 'ALL'
+                  ? '📝'
+                  : currentFilter === 'DRAFT'
+                    ? '📋'
+                    : currentFilter === 'ACTIVE'
+                      ? '✅'
+                      : '🔒'}
               </div>
               <h4 className="mb-2 text-xl font-semibold text-gray-900">
                 {currentFilter === 'ALL'
@@ -190,10 +209,14 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
             <div className="divide-y divide-gray-100">
               {forms.map((form) => {
                 const signedCount = form.submissions.filter((s) => s.status === 'SIGNED').length;
-                const declinedCount = form.submissions.filter((s) => s.status === 'DECLINED').length;
+                const declinedCount = form.submissions.filter(
+                  (s) => s.status === 'DECLINED'
+                ).length;
                 const pendingCount = form.submissions.filter((s) => s.status === 'PENDING').length;
                 const totalCount = form.submissions.length;
                 const isOverdue = new Date(form.deadline) < new Date() && form.status === 'ACTIVE';
+                const isOwner = form.teacher.id === user.id;
+                const canEdit = isOwner || form.shares[0]?.canEdit;
 
                 return (
                   <div key={form.id} className="p-6 transition-colors hover:bg-gray-50">
@@ -222,6 +245,11 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
                               Overdue
                             </span>
                           )}
+                          {!isOwner && (
+                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                              Shared by {form.teacher.name}
+                            </span>
+                          )}
                         </div>
 
                         <p className="mb-3 line-clamp-1 text-sm text-gray-600">
@@ -231,7 +259,12 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
                         {/* Stats Row */}
                         <div className="flex flex-wrap items-center gap-4 text-sm">
                           <div className="flex items-center gap-1.5 text-gray-600">
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -242,7 +275,12 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
                             Event: {format(new Date(form.eventDate), 'MMM d, yyyy')}
                           </div>
                           <div className="flex items-center gap-1.5 text-gray-600">
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -253,7 +291,12 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
                             Due: {format(new Date(form.deadline), 'MMM d, yyyy')}
                           </div>
                           <div className="flex items-center gap-1.5 text-gray-600">
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -303,7 +346,7 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
                         >
                           View
                         </Link>
-                        {form.status === 'DRAFT' && (
+                        {form.status === 'DRAFT' && canEdit && (
                           <Link
                             href={`/teacher/forms/${form.id}/edit`}
                             className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"

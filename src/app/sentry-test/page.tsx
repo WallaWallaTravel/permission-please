@@ -12,7 +12,7 @@ export default function SentryTestPage() {
       // Capture a test error directly
       Sentry.captureException(new Error('Test error from Sentry test page'));
       setStatus('✅ Error sent to Sentry! Check your dashboard.');
-    } catch (e) {
+    } catch {
       setStatus('❌ Failed to send error');
     }
   };

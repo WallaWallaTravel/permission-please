@@ -2,8 +2,10 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { DistributeButton } from '@/components/forms/DistributeButton';
+import { ShareFormButton } from '@/components/forms/ShareFormButton';
 
 interface FormData {
   form: {
@@ -15,6 +17,7 @@ interface FormData {
     deadline: string;
     status: 'DRAFT' | 'ACTIVE' | 'CLOSED';
     createdAt: string;
+    teacherId: string;
     teacher: {
       id: string;
       name: string;
@@ -26,6 +29,16 @@ interface FormData {
       label: string;
       required: boolean;
       order: number;
+    }>;
+    documents: Array<{
+      id: string;
+      fileName: string;
+      fileUrl: string;
+      fileSize: number;
+      mimeType: string;
+      description: string | null;
+      source: string;
+      requiresAck: boolean;
     }>;
     submissions: Array<{
       id: string;
@@ -48,6 +61,7 @@ interface FormData {
 export default function FormDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { data: session } = useSession();
   const [data, setData] = useState<FormData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -92,13 +106,34 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
   };
 
   const handleStatusChange = async (newStatus: 'ACTIVE' | 'CLOSED') => {
+    // Confirmation dialogs
+    if (newStatus === 'CLOSED') {
+      if (
+        !confirm(
+          'Are you sure you want to close this form? Parents will no longer be able to sign it.'
+        )
+      ) {
+        return;
+      }
+    }
+    if (newStatus === 'ACTIVE' && data?.form.status === 'CLOSED') {
+      if (!confirm('Reopen this form? Parents will be able to sign it again.')) {
+        return;
+      }
+    }
+
     try {
       const res = await fetch(`/api/forms/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) throw new Error('Failed to update status');
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update status');
+      }
+
       // Reload form data
       const formData = await res.json();
       setData({ form: formData.form });
@@ -136,6 +171,7 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
   if (!data) return null;
 
   const { form } = data;
+  const isOwner = session?.user?.id === form.teacherId;
   const eventDate = new Date(form.eventDate);
   const deadline = new Date(form.deadline);
   const signedCount = form.submissions.filter((s) => s.status === 'SIGNED').length;
@@ -171,7 +207,8 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
           </div>
           <h1 className="font-bold text-gray-900">Permission Please 📝</h1>
           <div className="flex items-center gap-3">
-            {form.status === 'DRAFT' && (
+            <ShareFormButton formId={form.id} isOwner={isOwner} />
+            {form.status === 'DRAFT' && isOwner && (
               <button
                 onClick={() => handleStatusChange('ACTIVE')}
                 className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
@@ -182,13 +219,23 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
             {form.status === 'ACTIVE' && (
               <>
                 <DistributeButton formId={form.id} />
-                <button
-                  onClick={() => handleStatusChange('CLOSED')}
-                  className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
-                >
-                  Close Form
-                </button>
+                {isOwner && (
+                  <button
+                    onClick={() => handleStatusChange('CLOSED')}
+                    className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+                  >
+                    Close Form
+                  </button>
+                )}
               </>
+            )}
+            {form.status === 'CLOSED' && isOwner && eventDate > new Date() && (
+              <button
+                onClick={() => handleStatusChange('ACTIVE')}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+              >
+                Reopen Form
+              </button>
             )}
           </div>
         </div>
@@ -208,11 +255,39 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
             <div className="flex items-start justify-between">
               <div>
                 <div className="mb-2 flex items-center gap-3">
-                  <span
-                    className={`rounded-full px-3 py-1 text-sm font-medium ${statusColors[form.status]}`}
-                  >
-                    {form.status}
-                  </span>
+                  {isOwner ? (
+                    <button
+                      onClick={() => {
+                        if (form.status === 'DRAFT') handleStatusChange('ACTIVE');
+                        else if (form.status === 'ACTIVE') handleStatusChange('CLOSED');
+                        else if (form.status === 'CLOSED' && eventDate > new Date())
+                          handleStatusChange('ACTIVE');
+                      }}
+                      disabled={form.status === 'CLOSED' && eventDate <= new Date()}
+                      className={`rounded-full px-3 py-1 text-sm font-medium transition-opacity ${statusColors[form.status]} ${
+                        form.status === 'CLOSED' && eventDate <= new Date()
+                          ? 'cursor-not-allowed opacity-75'
+                          : 'cursor-pointer hover:opacity-80'
+                      }`}
+                      title={
+                        form.status === 'DRAFT'
+                          ? 'Click to activate'
+                          : form.status === 'ACTIVE'
+                            ? 'Click to close'
+                            : eventDate > new Date()
+                              ? 'Click to reopen'
+                              : 'Cannot reopen - event has passed'
+                      }
+                    >
+                      {form.status}
+                    </button>
+                  ) : (
+                    <span
+                      className={`rounded-full px-3 py-1 text-sm font-medium ${statusColors[form.status]}`}
+                    >
+                      {form.status}
+                    </span>
+                  )}
                   <span className="text-sm text-emerald-100">
                     {form.eventType.replace('_', ' ')}
                   </span>
@@ -228,23 +303,35 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
           <div className="p-6">
             {/* Stats Row */}
             <div className="mb-6 grid grid-cols-4 gap-4">
-              <div className="rounded-lg bg-gray-50 p-4 text-center">
+              <div className="group relative rounded-lg bg-gray-50 p-4 text-center">
                 <p className="text-3xl font-bold text-gray-900">{totalSubmissions}</p>
                 <p className="text-sm text-gray-500">Total Sent</p>
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs whitespace-nowrap text-white shadow-lg group-hover:block">
+                  Total number of students this form was sent to
+                </div>
               </div>
-              <div className="rounded-lg bg-emerald-50 p-4 text-center">
+              <div className="group relative rounded-lg bg-emerald-50 p-4 text-center">
                 <p className="text-3xl font-bold text-emerald-600">{signedCount}</p>
                 <p className="text-sm text-gray-500">Signed</p>
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs whitespace-nowrap text-white shadow-lg group-hover:block">
+                  Parents who have signed the permission form
+                </div>
               </div>
-              <div className="rounded-lg bg-amber-50 p-4 text-center">
+              <div className="group relative rounded-lg bg-amber-50 p-4 text-center">
                 <p className="text-3xl font-bold text-amber-600">{pendingCount}</p>
-                <p className="text-sm text-gray-500">Pending</p>
+                <p className="text-sm text-gray-500">Awaiting Signature</p>
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs whitespace-nowrap text-white shadow-lg group-hover:block">
+                  Parents who received the form but haven&apos;t signed yet
+                </div>
               </div>
-              <div className="rounded-lg bg-blue-50 p-4 text-center">
+              <div className="group relative rounded-lg bg-blue-50 p-4 text-center">
                 <p className="text-3xl font-bold text-blue-600">
                   {totalSubmissions > 0 ? Math.round((signedCount / totalSubmissions) * 100) : 0}%
                 </p>
                 <p className="text-sm text-gray-500">Completion</p>
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs whitespace-nowrap text-white shadow-lg group-hover:block">
+                  Percentage of forms that have been signed
+                </div>
               </div>
             </div>
 
@@ -299,6 +386,79 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                           <span className="text-red-500">Required</span>
                         </>
                       )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Attached Documents */}
+            {form.documents && form.documents.length > 0 && (
+              <div className="mb-6">
+                <h3 className="mb-2 font-semibold text-gray-900">Attached Documents</h3>
+                <div className="space-y-3">
+                  {form.documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
+                    >
+                      <div className="rounded-lg bg-red-100 p-2">
+                        <svg
+                          className="h-6 w-6 text-red-600"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{doc.fileName}</p>
+                        {doc.description && (
+                          <p className="text-sm text-gray-600">{doc.description}</p>
+                        )}
+                        <p className="text-xs text-gray-500">
+                          {(doc.fileSize / 1024).toFixed(1)} KB •{' '}
+                          {doc.source === 'external'
+                            ? 'External Venue'
+                            : doc.source === 'school'
+                              ? 'School Document'
+                              : 'District Policy'}
+                          {doc.requiresAck && ' • Requires acknowledgment'}
+                        </p>
+                      </div>
+                      <a
+                        href={doc.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        View
+                      </a>
                     </div>
                   ))}
                 </div>
@@ -376,11 +536,17 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                                 ? 'bg-red-100 text-red-800'
                                 : 'bg-amber-100 text-amber-800'
                           }`}
+                          title={
+                            submission.status === 'SIGNED'
+                              ? 'Parent has signed the permission form'
+                              : submission.status === 'DECLINED'
+                                ? 'Parent declined to sign'
+                                : 'Waiting for parent to sign'
+                          }
                         >
-                          {submission.status === 'SIGNED' && '✓ '}
-                          {submission.status === 'DECLINED' && '✗ '}
-                          {submission.status === 'PENDING' && '⏳ '}
-                          {submission.status}
+                          {submission.status === 'SIGNED' && '✓ Signed'}
+                          {submission.status === 'DECLINED' && '✗ Declined'}
+                          {submission.status === 'PENDING' && '⏳ Awaiting Signature'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-500">
@@ -394,7 +560,12 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                             className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
                             title="Download PDF"
                           >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -418,22 +589,33 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* Actions */}
         <div className="flex items-center justify-between">
-          <Link
-            href={`/teacher/forms/${form.id}/edit`}
-            className="font-medium text-gray-600 hover:text-gray-900"
-          >
-            ✏️ Edit Form
-          </Link>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
-          >
-            {deleting ? 'Deleting...' : '🗑️ Delete Form'}
-          </button>
+          <div className="flex items-center gap-4">
+            {isOwner && (
+              <Link
+                href={`/teacher/forms/${form.id}/edit`}
+                className="font-medium text-gray-600 hover:text-gray-900"
+              >
+                ✏️ Edit Form
+              </Link>
+            )}
+            <Link
+              href={`/teacher/forms/${form.id}/print`}
+              className="font-medium text-gray-600 hover:text-gray-900"
+            >
+              🖨️ Print Form
+            </Link>
+          </div>
+          {isOwner && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+            >
+              {deleting ? 'Deleting...' : '🗑️ Delete Form'}
+            </button>
+          )}
         </div>
       </main>
     </div>
   );
 }
-

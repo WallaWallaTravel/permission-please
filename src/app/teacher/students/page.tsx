@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { SignOutButton } from '@/components/shared/SignOutButton';
 import { AddStudentForm } from '@/components/students/AddStudentForm';
 import { LinkParentForm } from '@/components/students/LinkParentForm';
+import { DeleteStudentButton } from '@/components/students/DeleteStudentButton';
+import { EditStudentModal } from '@/components/students/EditStudentModal';
+import { formatGrade } from '@/lib/utils/format-grade';
 
 export default async function StudentsPage() {
   const user = await getCurrentUser();
@@ -30,12 +33,28 @@ export default async function StudentsPage() {
           },
         },
       },
+      groups: {
+        include: {
+          group: {
+            select: { id: true, name: true },
+          },
+        },
+      },
       _count: {
         select: { formSubmissions: true },
       },
     },
     orderBy: { name: 'asc' },
   });
+
+  // Transform students to include relationship in a format the EditStudentModal expects
+  const studentsWithRelationship = students.map((student) => ({
+    ...student,
+    parents: student.parents.map((ps) => ({
+      parent: ps.parent,
+      relationship: ps.relationship,
+    })),
+  }));
 
   // Get parents filtered by school for linking
   const parents = await prisma.user.findMany({
@@ -76,6 +95,12 @@ export default async function StudentsPage() {
                 >
                   Students
                 </Link>
+                <Link
+                  href="/teacher/groups"
+                  className="rounded-lg px-4 py-2 text-gray-600 transition hover:bg-gray-50"
+                >
+                  Groups
+                </Link>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -103,7 +128,7 @@ export default async function StudentsPage() {
                 <h3 className="font-semibold text-gray-900">All Students ({students.length})</h3>
               </div>
 
-              {students.length === 0 ? (
+              {studentsWithRelationship.length === 0 ? (
                 <div className="p-12 text-center">
                   <div className="mb-4 text-5xl">👩‍🎓</div>
                   <h4 className="mb-2 text-xl font-semibold text-gray-900">No Students Yet</h4>
@@ -113,7 +138,7 @@ export default async function StudentsPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {students.map((student) => (
+                  {studentsWithRelationship.map((student) => (
                     <div key={student.id} className="p-6 transition-colors hover:bg-gray-50">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-4">
@@ -122,7 +147,7 @@ export default async function StudentsPage() {
                           </div>
                           <div>
                             <h4 className="font-semibold text-gray-900">{student.name}</h4>
-                            <p className="text-sm text-gray-500">Grade {student.grade}</p>
+                            <p className="text-sm text-gray-500">{formatGrade(student.grade)}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               {student.parents.length === 0 ? (
                                 <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">
@@ -138,14 +163,26 @@ export default async function StudentsPage() {
                                   </span>
                                 ))
                               )}
+                              {student.groups.map(({ group }) => (
+                                <span
+                                  key={group.id}
+                                  className="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-700"
+                                >
+                                  👥 {group.name}
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-500">
-                            {student._count.formSubmissions} form
-                            {student._count.formSubmissions !== 1 && 's'}
-                          </p>
+                        <div className="flex items-center gap-2">
+                          <div className="text-right">
+                            <p className="text-sm text-gray-500">
+                              {student._count.formSubmissions} form
+                              {student._count.formSubmissions !== 1 && 's'}
+                            </p>
+                          </div>
+                          <EditStudentModal student={student} allParents={parents} />
+                          <DeleteStudentButton studentId={student.id} studentName={student.name} />
                         </div>
                       </div>
                     </div>
@@ -187,4 +224,3 @@ export default async function StudentsPage() {
     </div>
   );
 }
-

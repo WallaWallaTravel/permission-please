@@ -26,10 +26,11 @@ model School {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  users    User[]
-  students Student[]
-  forms    PermissionForm[]
-  invites  Invite[]
+  users         User[]
+  students      Student[]
+  forms         PermissionForm[]
+  invites       Invite[]
+  studentGroups StudentGroup[]
 
   @@map("schools")
 }
@@ -67,6 +68,7 @@ model User {
   school           School?             @relation(fields: [schoolId], references: [id])
   accounts         Account[]           // OAuth accounts (Google, etc.)
   forms            PermissionForm[]    @relation("TeacherForms")
+  sharedForms      FormShare[]         @relation("SharedForms")
   parentStudents   ParentStudent[]
   formSubmissions  FormSubmission[]
   invitesSent      Invite[]            @relation("InviteCreator")
@@ -106,12 +108,39 @@ model Student {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  school          School?          @relation(fields: [schoolId], references: [id])
+  school          School?               @relation(fields: [schoolId], references: [id])
   parents         ParentStudent[]
   formSubmissions FormSubmission[]
+  groups          StudentGroupMember[]
 
   @@index([schoolId])
   @@map("students")
+}
+
+// Student groups for organizing students (classes, teams, activities)
+model StudentGroup {
+  id        String   @id @default(cuid())
+  schoolId  String?  @map("school_id")
+  name      String   // "Room 102", "Soccer Team", "Outdoor School"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  school  School?              @relation(fields: [schoolId], references: [id])
+  members StudentGroupMember[]
+
+  @@index([schoolId])
+  @@map("student_groups")
+}
+
+model StudentGroupMember {
+  groupId   String @map("group_id")
+  studentId String @map("student_id")
+
+  group   StudentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  student Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, studentId])
+  @@map("student_group_members")
 }
 
 model ParentStudent {
@@ -151,10 +180,27 @@ model PermissionForm {
   fields      FormField[]
   submissions FormSubmission[]
   documents   FormDocument[]
+  shares      FormShare[]
 
   @@index([teacherId, status])
   @@index([schoolId])
   @@map("permission_forms")
+}
+
+// Form sharing - allows teachers to share forms with other teachers/staff
+model FormShare {
+  id        String   @id @default(cuid())
+  formId    String   @map("form_id")
+  userId    String   @map("user_id")
+  canEdit   Boolean  @default(false) @map("can_edit")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  form PermissionForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  user User           @relation("SharedForms", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, userId])
+  @@index([userId])
+  @@map("form_shares")
 }
 
 model FormField {

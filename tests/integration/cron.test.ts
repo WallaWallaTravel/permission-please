@@ -145,6 +145,8 @@ describe('POST /api/cron/send-reminders', () => {
         ...mockDataFactory.formSubmission({ status: 'PENDING' }),
         form: {
           ...mockDataFactory.permissionForm({ deadline: tomorrow, status: 'ACTIVE' }),
+          teacher: { name: 'Test Teacher' },
+          school: { name: 'Test School' },
         },
         parent: { id: 'parent-1', email: 'parent@example.com', name: 'Test Parent' },
         student: { id: 'student-1', name: 'Test Student' },
@@ -180,6 +182,8 @@ describe('POST /api/cron/send-reminders', () => {
         ...mockDataFactory.formSubmission({ status: 'PENDING' }),
         form: {
           ...mockDataFactory.permissionForm({ deadline: tomorrow, status: 'ACTIVE' }),
+          teacher: { name: 'Test Teacher' },
+          school: { name: 'Test School' },
         },
         parent: { id: 'parent-1', email: 'parent@example.com', name: 'Test Parent' },
         student: { id: 'student-1', name: 'Test Student' },
@@ -214,6 +218,8 @@ describe('POST /api/cron/send-reminders', () => {
         ...mockDataFactory.formSubmission({ id: 'sub-1', status: 'PENDING' }),
         form: {
           ...mockDataFactory.permissionForm({ id: 'form-1', deadline: tomorrow, status: 'ACTIVE' }),
+          teacher: { name: 'Test Teacher' },
+          school: { name: 'Test School' },
         },
         parent: { id: 'parent-1', email: 'parent@example.com', name: 'Test Parent' },
         student: { id: 'student-1', name: 'Student 1' },
@@ -222,6 +228,8 @@ describe('POST /api/cron/send-reminders', () => {
         ...mockDataFactory.formSubmission({ id: 'sub-2', status: 'PENDING' }),
         form: {
           ...mockDataFactory.permissionForm({ id: 'form-2', deadline: tomorrow, status: 'ACTIVE' }),
+          teacher: { name: 'Test Teacher' },
+          school: { name: 'Test School' },
         },
         parent: { id: 'parent-1', email: 'parent@example.com', name: 'Test Parent' },
         student: { id: 'student-2', name: 'Student 2' },

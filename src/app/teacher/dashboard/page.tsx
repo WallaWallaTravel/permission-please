@@ -121,6 +121,12 @@ export default async function TeacherDashboardPage({ searchParams }: PageProps) 
                 >
                   Students
                 </Link>
+                <Link
+                  href="/teacher/groups"
+                  className="rounded-lg px-4 py-2 text-gray-600 transition hover:bg-gray-50"
+                >
+                  Groups
+                </Link>
               </div>
             </div>
             <div className="flex items-center gap-4">

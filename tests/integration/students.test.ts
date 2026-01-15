@@ -185,11 +185,27 @@ describe('POST /api/students', () => {
     const { POST } = await import('@/app/api/students/route');
 
     const newStudent = mockDataFactory.student({ name: 'New Student', grade: '3rd' });
+    const mockParent = {
+      id: 'parent-new',
+      name: 'Parent Name',
+      email: 'parent@test.com',
+      role: 'PARENT',
+    };
+    mockPrismaClient.user.findUnique.mockResolvedValue(null); // No existing teacher or parent
+    mockPrismaClient.user.create.mockResolvedValue(mockParent);
     mockPrismaClient.student.create.mockResolvedValue(newStudent);
+    mockPrismaClient.parentStudent.findUnique.mockResolvedValue(null);
+    mockPrismaClient.parentStudent.create.mockResolvedValue({});
+    mockPrismaClient.$transaction.mockImplementation((fn) => fn(mockPrismaClient));
 
     const request = createNextRequest('http://localhost:6001/api/students', {
       method: 'POST',
-      body: { name: 'New Student', grade: '3rd' },
+      body: {
+        name: 'New Student',
+        grade: '3rd',
+        parentName: 'Parent Name',
+        parentEmail: 'parent@test.com',
+      },
     });
     const response = await POST(request);
     const data = await response.json();
@@ -206,7 +222,7 @@ describe('POST /api/students', () => {
 
     const request = createNextRequest('http://localhost:6001/api/students', {
       method: 'POST',
-      body: { name: '', grade: '' }, // Empty required fields
+      body: { name: '', grade: '', parentName: '', parentEmail: '' }, // Empty required fields
     });
     const response = await POST(request);
     const data = await response.json();
@@ -222,7 +238,12 @@ describe('POST /api/students', () => {
 
     const request = createNextRequest('http://localhost:6001/api/students', {
       method: 'POST',
-      body: { name: 'A'.repeat(101), grade: '3rd' }, // Name too long
+      body: {
+        name: 'A'.repeat(101),
+        grade: '3rd',
+        parentName: 'Parent',
+        parentEmail: 'parent@test.com',
+      }, // Name too long
     });
     const response = await POST(request);
 
@@ -235,11 +256,27 @@ describe('POST /api/students', () => {
     const { POST } = await import('@/app/api/students/route');
 
     const newStudent = mockDataFactory.student({ name: 'Admin Created', grade: '5th' });
+    const mockParent = {
+      id: 'parent-admin',
+      name: 'Admin Parent',
+      email: 'adminparent@test.com',
+      role: 'PARENT',
+    };
+    mockPrismaClient.user.findUnique.mockResolvedValue(null);
+    mockPrismaClient.user.create.mockResolvedValue(mockParent);
     mockPrismaClient.student.create.mockResolvedValue(newStudent);
+    mockPrismaClient.parentStudent.findUnique.mockResolvedValue(null);
+    mockPrismaClient.parentStudent.create.mockResolvedValue({});
+    mockPrismaClient.$transaction.mockImplementation((fn) => fn(mockPrismaClient));
 
     const request = createNextRequest('http://localhost:6001/api/students', {
       method: 'POST',
-      body: { name: 'Admin Created', grade: '5th' },
+      body: {
+        name: 'Admin Created',
+        grade: '5th',
+        parentName: 'Admin Parent',
+        parentEmail: 'adminparent@test.com',
+      },
     });
     const response = await POST(request);
 

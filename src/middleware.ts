@@ -90,10 +90,13 @@ export async function middleware(request: NextRequest) {
 
   // Redirect authenticated users from auth routes to their dashboard
   if (isAuthRoute && isAuthenticated) {
-    const dashboardUrl = new URL(
-      userRole === 'PARENT' ? '/parent/dashboard' : '/teacher/dashboard',
-      request.url
-    );
+    let dashboardPath = '/teacher/dashboard';
+    if (userRole === 'PARENT') {
+      dashboardPath = '/parent/dashboard';
+    } else if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') {
+      dashboardPath = '/admin/dashboard';
+    }
+    const dashboardUrl = new URL(dashboardPath, request.url);
     return NextResponse.redirect(dashboardUrl);
   }
 

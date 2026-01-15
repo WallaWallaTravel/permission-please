@@ -11,6 +11,7 @@ export const mockPrismaClient = {
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+    count: vi.fn(),
   },
   permissionForm: {
     findUnique: vi.fn(),
@@ -70,6 +71,12 @@ export const mockPrismaClient = {
   auditLog: {
     findMany: vi.fn(),
     create: vi.fn(),
+  },
+  formShare: {
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
   },
   passwordResetToken: {
     findUnique: vi.fn(),

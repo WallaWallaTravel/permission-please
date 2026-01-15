@@ -14,7 +14,7 @@ describe('GET /api/health', () => {
 
   it('returns healthy status when database is connected', async () => {
     const { GET } = await import('@/app/api/health/route');
-    mockPrismaClient.$queryRaw.mockResolvedValue([{ result: 1 }]);
+    mockPrismaClient.user.count.mockResolvedValue(5);
 
     const response = await GET();
     const data = await response.json();
@@ -29,7 +29,7 @@ describe('GET /api/health', () => {
 
   it('returns unhealthy status when database is down', async () => {
     const { GET } = await import('@/app/api/health/route');
-    mockPrismaClient.$queryRaw.mockRejectedValue(new Error('Connection refused'));
+    mockPrismaClient.user.count.mockRejectedValue(new Error('Connection refused'));
 
     const response = await GET();
     const data = await response.json();
@@ -42,7 +42,7 @@ describe('GET /api/health', () => {
 
   it('includes database latency in response', async () => {
     const { GET } = await import('@/app/api/health/route');
-    mockPrismaClient.$queryRaw.mockResolvedValue([{ result: 1 }]);
+    mockPrismaClient.user.count.mockResolvedValue(5);
 
     const response = await GET();
     const data = await response.json();
@@ -53,7 +53,7 @@ describe('GET /api/health', () => {
 
   it('includes memory metrics', async () => {
     const { GET } = await import('@/app/api/health/route');
-    mockPrismaClient.$queryRaw.mockResolvedValue([{ result: 1 }]);
+    mockPrismaClient.user.count.mockResolvedValue(5);
 
     const response = await GET();
     const data = await response.json();
@@ -66,7 +66,7 @@ describe('GET /api/health', () => {
 
   it('includes version info', async () => {
     const { GET } = await import('@/app/api/health/route');
-    mockPrismaClient.$queryRaw.mockResolvedValue([{ result: 1 }]);
+    mockPrismaClient.user.count.mockResolvedValue(5);
 
     const response = await GET();
     const data = await response.json();
