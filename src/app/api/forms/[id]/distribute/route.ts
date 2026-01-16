@@ -46,6 +46,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
+    // Block distribution if form requires review but hasn't been approved
+    if (form.requiresReview && form.reviewStatus !== 'APPROVED') {
+      const statusMessages: Record<string, string> = {
+        PENDING_REVIEW: 'This form is pending review and cannot be distributed yet.',
+        REVISION_NEEDED:
+          'This form needs revisions. Please address the reviewer comments and resubmit.',
+      };
+      const message = form.reviewStatus
+        ? statusMessages[form.reviewStatus] || 'This form requires approval before distribution.'
+        : 'This form requires review before it can be distributed. Please submit it for review first.';
+
+      return NextResponse.json(
+        {
+          error: message,
+          code: 'REVIEW_REQUIRED',
+          reviewStatus: form.reviewStatus,
+        },
+        { status: 400 }
+      );
+    }
+
     // Use transaction for atomicity: activate form + create submissions
     const result = await prisma.$transaction(async (tx) => {
       // Activate form if in draft

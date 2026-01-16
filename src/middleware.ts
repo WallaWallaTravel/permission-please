@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
 // Routes that require authentication
-const protectedRoutes = ['/teacher', '/parent', '/admin'];
+const protectedRoutes = ['/teacher', '/parent', '/admin', '/reviewer'];
 
 // Routes that should redirect authenticated users
 const authRoutes = ['/login', '/signup'];
@@ -13,7 +13,8 @@ const roleRoutes: Record<string, string[]> = {
   TEACHER: ['/teacher'],
   ADMIN: ['/teacher', '/parent', '/admin'], // Admins can access teacher, parent, and admin
   PARENT: ['/parent'],
-  SUPER_ADMIN: ['/teacher', '/parent', '/admin'], // Super admins can access everything
+  REVIEWER: ['/reviewer'], // Reviewers can only access reviewer routes
+  SUPER_ADMIN: ['/teacher', '/parent', '/admin', '/reviewer'], // Super admins can access everything
 };
 
 /**
@@ -93,6 +94,8 @@ export async function middleware(request: NextRequest) {
     let dashboardPath = '/teacher/dashboard';
     if (userRole === 'PARENT') {
       dashboardPath = '/parent/dashboard';
+    } else if (userRole === 'REVIEWER') {
+      dashboardPath = '/reviewer/dashboard';
     } else if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') {
       dashboardPath = '/admin/dashboard';
     }
@@ -107,10 +110,15 @@ export async function middleware(request: NextRequest) {
 
     if (!hasAccess) {
       // Redirect to appropriate dashboard based on role
-      const dashboardUrl = new URL(
-        userRole === 'PARENT' ? '/parent/dashboard' : '/teacher/dashboard',
-        request.url
-      );
+      let redirectPath = '/teacher/dashboard';
+      if (userRole === 'PARENT') {
+        redirectPath = '/parent/dashboard';
+      } else if (userRole === 'REVIEWER') {
+        redirectPath = '/reviewer/dashboard';
+      } else if (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') {
+        redirectPath = '/admin/dashboard';
+      }
+      const dashboardUrl = new URL(redirectPath, request.url);
       return NextResponse.redirect(dashboardUrl);
     }
   }

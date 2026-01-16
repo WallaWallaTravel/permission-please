@@ -23,6 +23,14 @@ interface FormData {
       name: string;
       email: string;
     };
+    // Review workflow fields
+    requiresReview: boolean;
+    reviewStatus: 'PENDING_REVIEW' | 'APPROVED' | 'REVISION_NEEDED' | null;
+    reviewNeededBy: string | null;
+    isExpedited: boolean;
+    reviewedAt: string | null;
+    reviewComments: string | null;
+    reviewer: { id: string; name: string } | null;
     fields: Array<{
       id: string;
       fieldType: string;
@@ -66,6 +74,7 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [submittingForReview, setSubmittingForReview] = useState(false);
 
   useEffect(() => {
     async function loadForm() {
@@ -139,6 +148,38 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
       setData({ form: formData.form });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update status');
+    }
+  };
+
+  const handleSubmitForReview = async () => {
+    if (!data?.form.requiresReview) return;
+
+    setSubmittingForReview(true);
+    setError('');
+
+    try {
+      const res = await fetch(`/api/forms/${id}/submit-for-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewNeededBy: data.form.reviewNeededBy,
+          isExpedited: data.form.isExpedited,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to submit for review');
+      }
+
+      // Reload form data
+      const formRes = await fetch(`/api/forms/${id}`);
+      const formData = await formRes.json();
+      setData(formData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit for review');
+    } finally {
+      setSubmittingForReview(false);
     }
   };
 
@@ -366,6 +407,112 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
               <h3 className="mb-2 font-semibold text-gray-900">Description</h3>
               <p className="whitespace-pre-wrap text-gray-700">{form.description}</p>
             </div>
+
+            {/* Review Status (only show if form requires review) */}
+            {form.requiresReview && (
+              <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Review Status</h3>
+                    <p className="text-sm text-gray-600">
+                      This form requires approval before distribution
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {form.isExpedited && (
+                      <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-medium text-orange-800">
+                        Expedited
+                      </span>
+                    )}
+                    {!form.reviewStatus && (
+                      <span className="rounded-full bg-gray-200 px-3 py-1 text-sm font-medium text-gray-700">
+                        Not Submitted
+                      </span>
+                    )}
+                    {form.reviewStatus === 'PENDING_REVIEW' && (
+                      <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+                        Pending Review
+                      </span>
+                    )}
+                    {form.reviewStatus === 'APPROVED' && (
+                      <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+                        Approved
+                      </span>
+                    )}
+                    {form.reviewStatus === 'REVISION_NEEDED' && (
+                      <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
+                        Revision Needed
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Reviewer comments (if revision needed) */}
+                {form.reviewStatus === 'REVISION_NEEDED' && form.reviewComments && (
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
+                    <div className="flex gap-3">
+                      <svg
+                        className="h-5 w-5 flex-shrink-0 text-red-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <div>
+                        <p className="font-medium text-red-800">Reviewer Feedback</p>
+                        <p className="mt-1 text-sm text-red-700">{form.reviewComments}</p>
+                        {form.reviewer && (
+                          <p className="mt-2 text-xs text-red-600">
+                            From: {form.reviewer.name} •{' '}
+                            {form.reviewedAt && new Date(form.reviewedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Approval info */}
+                {form.reviewStatus === 'APPROVED' && form.reviewer && (
+                  <div className="mt-4 text-sm text-gray-600">
+                    Approved by {form.reviewer.name} on{' '}
+                    {form.reviewedAt && new Date(form.reviewedAt).toLocaleDateString()}
+                  </div>
+                )}
+
+                {/* Submit for Review button (only for drafts that haven't been submitted) */}
+                {form.status === 'DRAFT' && !form.reviewStatus && isOwner && (
+                  <div className="mt-4">
+                    <button
+                      onClick={handleSubmitForReview}
+                      disabled={submittingForReview}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {submittingForReview ? 'Submitting...' : 'Submit for Review'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Resubmit after revision */}
+                {form.status === 'DRAFT' && form.reviewStatus === 'REVISION_NEEDED' && isOwner && (
+                  <div className="mt-4">
+                    <button
+                      onClick={handleSubmitForReview}
+                      disabled={submittingForReview}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {submittingForReview ? 'Resubmitting...' : 'Resubmit for Review'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Custom Fields */}
             {form.fields.length > 0 && (

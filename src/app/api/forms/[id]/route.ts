@@ -32,6 +32,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
             email: true,
           },
         },
+        reviewer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         fields: {
           orderBy: {
             order: 'asc',

@@ -31,6 +31,7 @@ interface School {
 const ROLE_COLORS: Record<string, string> = {
   SUPER_ADMIN: 'bg-purple-100 text-purple-700',
   ADMIN: 'bg-blue-100 text-blue-700',
+  REVIEWER: 'bg-indigo-100 text-indigo-700',
   TEACHER: 'bg-green-100 text-green-700',
   PARENT: 'bg-amber-100 text-amber-700',
 };
@@ -186,6 +187,7 @@ export default function UsersPage() {
             <option value="all">All Roles</option>
             <option value="SUPER_ADMIN">Super Admin</option>
             <option value="ADMIN">Admin</option>
+            <option value="REVIEWER">Reviewer</option>
             <option value="TEACHER">Teacher</option>
             <option value="PARENT">Parent</option>
           </select>
@@ -248,6 +250,7 @@ export default function UsersPage() {
                     >
                       <option value="PARENT">Parent</option>
                       <option value="TEACHER">Teacher</option>
+                      <option value="REVIEWER">Reviewer</option>
                       <option value="ADMIN">Admin</option>
                       <option value="SUPER_ADMIN">Super Admin</option>
                     </select>
@@ -281,6 +284,8 @@ export default function UsersPage() {
                       )
                     ) : user.role === 'PARENT' ? (
                       <span>{user._count.formSubmissions} signatures</span>
+                    ) : user.role === 'REVIEWER' ? (
+                      <span className="text-indigo-600">Form reviewer</span>
                     ) : (
                       <span className="text-gray-400">-</span>
                     )}

@@ -109,6 +109,12 @@ export async function POST(request: Request) {
         status: validatedData.status,
         remindersEnabled: validatedData.remindersEnabled ?? true,
         reminderSchedule: reminderSchedule ? JSON.parse(reminderSchedule) : undefined,
+        // Review workflow fields
+        requiresReview: validatedData.requiresReview ?? false,
+        reviewNeededBy: validatedData.reviewNeededBy
+          ? new Date(validatedData.reviewNeededBy)
+          : null,
+        isExpedited: validatedData.isExpedited ?? false,
         fields: validatedData.fields
           ? {
               create: validatedData.fields.map((field) => ({

@@ -13,6 +13,7 @@ enum Role {
   PARENT
   ADMIN
   SUPER_ADMIN
+  REVIEWER
 }
 
 model School {
@@ -39,6 +40,12 @@ enum FormStatus {
   DRAFT
   ACTIVE
   CLOSED
+}
+
+enum ReviewStatus {
+  PENDING_REVIEW
+  APPROVED
+  REVISION_NEEDED
 }
 
 enum SubmissionStatus {
@@ -68,11 +75,13 @@ model User {
   school           School?             @relation(fields: [schoolId], references: [id])
   accounts         Account[]           // OAuth accounts (Google, etc.)
   forms            PermissionForm[]    @relation("TeacherForms")
+  reviewedForms    PermissionForm[]    @relation("FormReviewer")
   sharedForms      FormShare[]         @relation("SharedForms")
   parentStudents   ParentStudent[]
   formSubmissions  FormSubmission[]
   invitesSent      Invite[]            @relation("InviteCreator")
   auditLogs        AuditLog[]
+  reviewLogs       FormReviewLog[]
 
   @@index([schoolId])
   @@map("users")
@@ -174,16 +183,28 @@ model PermissionForm {
   reminderSchedule Json?   @default("[{\"value\":7,\"unit\":\"days\"},{\"value\":3,\"unit\":\"days\"},{\"value\":1,\"unit\":\"days\"}]") @map("reminder_schedule")
   remindersEnabled Boolean @default(true) @map("reminders_enabled")
 
+  // Review workflow for waiver/consent forms
+  requiresReview    Boolean       @default(false) @map("requires_review")
+  reviewStatus      ReviewStatus? @map("review_status")
+  reviewNeededBy    DateTime?     @map("review_needed_by")
+  isExpedited       Boolean       @default(false) @map("is_expedited")
+  reviewedBy        String?       @map("reviewed_by")
+  reviewedAt        DateTime?     @map("reviewed_at")
+  reviewComments    String?       @map("review_comments") @db.Text
+
   // Relations
   school      School?          @relation(fields: [schoolId], references: [id])
   teacher     User             @relation("TeacherForms", fields: [teacherId], references: [id], onDelete: Cascade)
+  reviewer    User?            @relation("FormReviewer", fields: [reviewedBy], references: [id])
   fields      FormField[]
   submissions FormSubmission[]
   documents   FormDocument[]
   shares      FormShare[]
+  reviewLogs  FormReviewLog[]
 
   @@index([teacherId, status])
   @@index([schoolId])
+  @@index([reviewStatus])
   @@map("permission_forms")
 }
 
@@ -331,4 +352,22 @@ model FormDocument {
 
   @@index([formId])
   @@map("form_documents")
+}
+
+// Audit trail for form review workflow
+model FormReviewLog {
+  id          String   @id @default(cuid())
+  formId      String   @map("form_id")
+  reviewerId  String   @map("reviewer_id")
+  action      String   // SUBMITTED, APPROVED, REVISION_NEEDED, EDITED
+  comments    String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  form        PermissionForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  reviewer    User           @relation(fields: [reviewerId], references: [id])
+
+  @@index([formId])
+  @@index([reviewerId])
+  @@map("form_review_logs")
 }

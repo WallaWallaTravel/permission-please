@@ -38,6 +38,10 @@ const baseFormSchema = z.object({
   reminderSchedule: z.array(reminderIntervalSchema).optional(),
   // External documents
   documents: z.array(formDocumentSchema).optional(),
+  // Review workflow (for waiver/consent forms)
+  requiresReview: z.boolean().default(false),
+  reviewNeededBy: z.string().datetime().nullable().optional(),
+  isExpedited: z.boolean().default(false),
 });
 
 export const createFormSchema = baseFormSchema.refine(
