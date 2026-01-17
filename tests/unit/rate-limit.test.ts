@@ -141,9 +141,9 @@ describe('rateLimitPresets', () => {
     expect(rateLimitPresets.formSubmit.max).toBeGreaterThan(0);
   });
 
-  it('has email preset with strict limits', () => {
+  it('has email preset with moderate limits', () => {
     expect(rateLimitPresets.email).toBeDefined();
-    expect(rateLimitPresets.email.max).toBeLessThanOrEqual(10);
+    expect(rateLimitPresets.email.max).toBeLessThanOrEqual(30); // Allow batch admin operations
   });
 
   it('has health preset with lenient limits', () => {

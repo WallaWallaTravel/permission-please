@@ -212,8 +212,8 @@ export const rateLimitPresets = {
   // Form submission (moderate)
   formSubmit: { max: 30, windowMs: 60000 },
 
-  // Email sending (very strict)
-  email: { max: 5, windowMs: 60000 },
+  // Email sending (moderate - allows batch invites)
+  email: { max: 20, windowMs: 60000 },
 
   // Magic link requests (strict to prevent email abuse)
   magicLink: { max: 5, windowMs: 60000 },
