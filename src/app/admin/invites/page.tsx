@@ -41,6 +41,14 @@ export default function InvitesPage() {
     schoolId: '',
   });
 
+  // State for existing user assignment
+  const [existingUserInfo, setExistingUserInfo] = useState<{
+    email: string;
+    schoolId: string;
+    schoolName: string;
+  } | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -72,6 +80,7 @@ export default function InvitesPage() {
     e.preventDefault();
     setIsCreating(true);
     setError(null);
+    setExistingUserInfo(null);
 
     try {
       const response = await fetch('/api/admin/invites', {
@@ -87,7 +96,21 @@ export default function InvitesPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Failed to create invite');
+        // Check if user already exists and we have a school selected
+        if (
+          response.status === 409 &&
+          data.error?.includes('already exists') &&
+          formData.schoolId
+        ) {
+          const selectedSchool = schools.find((s) => s.id === formData.schoolId);
+          setExistingUserInfo({
+            email: formData.email,
+            schoolId: formData.schoolId,
+            schoolName: selectedSchool?.name || 'this school',
+          });
+        } else {
+          setError(data.error || 'Failed to create invite');
+        }
         return;
       }
 
@@ -101,6 +124,53 @@ export default function InvitesPage() {
       setError('Network error. Please try again.');
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleAssignExistingUser() {
+    if (!existingUserInfo) return;
+
+    setIsAssigning(true);
+    setError(null);
+
+    try {
+      // First, find the user by email
+      const usersRes = await fetch('/api/admin/users');
+      if (!usersRes.ok) throw new Error('Failed to fetch users');
+
+      const usersData = await usersRes.json();
+      const user = usersData.users.find(
+        (u: { email: string }) => u.email.toLowerCase() === existingUserInfo.email.toLowerCase()
+      );
+
+      if (!user) {
+        setError('Could not find user');
+        return;
+      }
+
+      // Update the user's school
+      const response = await fetch(`/api/admin/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schoolId: existingUserInfo.schoolId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error || 'Failed to assign user to school');
+        return;
+      }
+
+      setSuccess(`${existingUserInfo.email} has been assigned to ${existingUserInfo.schoolName}`);
+      setShowCreateModal(false);
+      setFormData({ email: '', role: 'ADMIN', schoolId: '' });
+      setExistingUserInfo(null);
+
+      setTimeout(() => setSuccess(null), 5000);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setIsAssigning(false);
     }
   }
 
@@ -363,12 +433,33 @@ export default function InvitesPage() {
                   </div>
                 )}
 
+                {existingUserInfo && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                    <p className="text-sm font-medium text-blue-800">
+                      This user already has an account
+                    </p>
+                    <p className="mt-1 text-sm text-blue-700">
+                      Would you like to assign {existingUserInfo.email} to{' '}
+                      {existingUserInfo.schoolName}?
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleAssignExistingUser}
+                      disabled={isAssigning}
+                      className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {isAssigning ? 'Assigning...' : `Assign to ${existingUserInfo.schoolName}`}
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
                     onClick={() => {
                       setShowCreateModal(false);
                       setError(null);
+                      setExistingUserInfo(null);
                       setFormData({ email: '', role: 'ADMIN', schoolId: '' });
                     }}
                     className="flex-1 rounded-lg border border-slate-300 px-4 py-2 transition-colors hover:bg-slate-50"
