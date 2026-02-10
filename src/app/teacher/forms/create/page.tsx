@@ -371,7 +371,18 @@ export default function CreateFormPage() {
               {/* Start from Scratch */}
               <button
                 type="button"
-                onClick={() => setShowTemplates(false)}
+                onClick={() => {
+                  setFormData({
+                    title: '',
+                    description: '',
+                    eventDate: '',
+                    eventType: 'FIELD_TRIP',
+                    deadline: '',
+                    status: 'DRAFT',
+                  });
+                  setFields([]);
+                  setShowTemplates(false);
+                }}
                 className="group rounded-xl border-2 border-dashed border-gray-300 p-6 text-left transition-all hover:border-blue-400 hover:bg-blue-50/50"
               >
                 <div className="mb-3 text-3xl">✏️</div>
