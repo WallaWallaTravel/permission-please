@@ -10,7 +10,9 @@ type RouteContext = {
 };
 
 const updateUserSchema = z.object({
-  role: z.enum(['TEACHER', 'PARENT', 'ADMIN', 'SUPER_ADMIN']).optional(),
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  role: z.enum(['TEACHER', 'PARENT', 'ADMIN', 'SUPER_ADMIN', 'REVIEWER']).optional(),
   schoolId: z.string().nullable().optional(),
 });
 
@@ -46,6 +48,18 @@ export async function GET(request: NextRequest, context: RouteContext) {
             id: true,
             name: true,
             subdomain: true,
+          },
+        },
+        parentStudents: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                name: true,
+                grade: true,
+                school: { select: { id: true, name: true } },
+              },
+            },
           },
         },
         _count: {
@@ -102,6 +116,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const body = await request.json();
     const validatedData = updateUserSchema.parse(body);
 
+    // If email is being changed, check for uniqueness
+    if (validatedData.email && validatedData.email !== existingUser.email) {
+      const emailExists = await prisma.user.findUnique({
+        where: { email: validatedData.email },
+      });
+      if (emailExists) {
+        return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
+      }
+    }
+
     // If schoolId is provided, verify it exists
     if (validatedData.schoolId) {
       const school = await prisma.school.findUnique({
@@ -115,6 +139,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const user = await prisma.user.update({
       where: { id },
       data: {
+        ...(validatedData.name && { name: validatedData.name }),
+        ...(validatedData.email && { email: validatedData.email }),
         ...(validatedData.role && { role: validatedData.role }),
         ...(validatedData.schoolId !== undefined && { schoolId: validatedData.schoolId }),
       },

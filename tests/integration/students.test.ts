@@ -9,6 +9,7 @@ const mockTeacherSession = {
     email: 'teacher@school.edu',
     name: 'Test Teacher',
     role: 'TEACHER' as const,
+    schoolId: 'school-1',
   },
   expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };
@@ -29,6 +30,7 @@ const mockAdminSession = {
     email: 'admin@school.edu',
     name: 'Admin User',
     role: 'ADMIN' as const,
+    schoolId: 'school-1',
   },
   expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };

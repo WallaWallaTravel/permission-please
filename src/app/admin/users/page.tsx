@@ -235,7 +235,12 @@ export default function UsersPage() {
                 <tr key={user.id} className="transition-colors hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div>
-                      <p className="font-medium text-gray-900">{user.name}</p>
+                      <button
+                        onClick={() => router.push(`/admin/users/${user.id}`)}
+                        className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {user.name}
+                      </button>
                       <p className="text-sm text-gray-500">{user.email}</p>
                     </div>
                   </td>
@@ -283,7 +288,16 @@ export default function UsersPage() {
                         <span>0 forms</span>
                       )
                     ) : user.role === 'PARENT' ? (
-                      <span>{user._count.formSubmissions} signatures</span>
+                      user._count.formSubmissions > 0 ? (
+                        <button
+                          onClick={() => router.push(`/admin/users/${user.id}/signatures`)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {user._count.formSubmissions} signatures
+                        </button>
+                      ) : (
+                        <span>0 signatures</span>
+                      )
                     ) : user.role === 'REVIEWER' ? (
                       <span className="text-indigo-600">Form reviewer</span>
                     ) : (

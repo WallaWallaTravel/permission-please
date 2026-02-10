@@ -32,9 +32,16 @@ interface ParsedRow {
   relationship: string;
 }
 
+interface CurrentUser {
+  id: string;
+  schoolId: string | null;
+  role: string;
+}
+
 export default function ImportPage() {
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState('');
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
@@ -43,22 +50,38 @@ export default function ImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetchSchools();
+    fetchData();
   }, []);
 
-  async function fetchSchools() {
+  async function fetchData() {
     try {
-      const response = await fetch('/api/admin/schools');
-      if (response.ok) {
-        const data = await response.json();
+      const [schoolsRes, userRes] = await Promise.all([
+        fetch('/api/admin/schools'),
+        fetch('/api/user/me'),
+      ]);
+
+      if (schoolsRes.ok) {
+        const data = await schoolsRes.json();
         setSchools(data.schools);
       }
+
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        setCurrentUser(userData.user);
+        // Default to user's school if they have one
+        if (userData.user?.schoolId) {
+          setSelectedSchool(userData.user.schoolId);
+        }
+      }
     } catch {
-      console.error('Failed to fetch schools');
+      console.error('Failed to fetch data');
     } finally {
       setIsLoading(false);
     }
   }
+
+  // Check if user can change school (only SUPER_ADMIN can)
+  const canChangeSchool = currentUser?.role === 'SUPER_ADMIN';
 
   function parseCSV(text: string): ParsedRow[] {
     const lines = text.trim().split('\n');
@@ -250,20 +273,27 @@ export default function ImportPage() {
       {/* School Selection */}
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <label className="mb-2 block text-sm font-medium text-slate-700">
-          Assign to School (Optional)
+          Assign to School {!canChangeSchool && currentUser?.schoolId && '(Your school)'}
         </label>
         <select
           value={selectedSchool}
           onChange={(e) => setSelectedSchool(e.target.value)}
-          className="w-full max-w-md rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          disabled={!canChangeSchool && !!currentUser?.schoolId}
+          className="w-full max-w-md rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100"
         >
-          <option value="">No specific school</option>
+          {canChangeSchool && <option value="">No specific school</option>}
           {schools.map((school) => (
             <option key={school.id} value={school.id}>
               {school.name}
             </option>
           ))}
         </select>
+        {!canChangeSchool && currentUser?.schoolId && (
+          <p className="mt-2 text-sm text-slate-500">
+            Students will be assigned to your school. Contact a super admin to import to a different
+            school.
+          </p>
+        )}
       </div>
 
       {/* File Upload */}

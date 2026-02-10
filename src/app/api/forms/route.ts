@@ -23,13 +23,27 @@ export async function GET(request: Request) {
     const status = searchParams.get('status');
 
     // Build query based on role
-    const where =
-      user.role === 'TEACHER' || user.role === 'ADMIN'
-        ? {
-            teacherId: user.id,
-            ...(status && { status: status as 'DRAFT' | 'ACTIVE' | 'CLOSED' }),
-          }
-        : undefined;
+    let where: Record<string, unknown> = {};
+
+    if (user.role === 'TEACHER' || user.role === 'ADMIN') {
+      where = {
+        teacherId: user.id,
+        ...(status && { status: status as 'DRAFT' | 'ACTIVE' | 'CLOSED' }),
+      };
+    } else if (user.role === 'PARENT') {
+      // Parents can only see forms they have submissions for
+      where = {
+        submissions: {
+          some: { parentId: user.id },
+        },
+      };
+    } else {
+      // Any other role: restrict to their school's forms
+      where = {
+        ...(user.schoolId && { schoolId: user.schoolId }),
+        ...(status && { status: status as 'DRAFT' | 'ACTIVE' | 'CLOSED' }),
+      };
+    }
 
     const forms = await prisma.permissionForm.findMany({
       where,

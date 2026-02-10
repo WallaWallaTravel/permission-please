@@ -28,11 +28,17 @@ export default async function UserFormsPage({ params }: PageProps) {
       name: true,
       email: true,
       role: true,
+      schoolId: true,
     },
   });
 
   if (!user) {
     notFound();
+  }
+
+  // School isolation: ADMIN can only view users from their school
+  if (currentUser.role === 'ADMIN' && user.schoolId !== currentUser.schoolId) {
+    redirect('/admin/users');
   }
 
   const forms = await prisma.permissionForm.findMany({

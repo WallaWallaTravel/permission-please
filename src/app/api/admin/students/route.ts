@@ -40,6 +40,9 @@ export async function GET(request: Request) {
       where,
       orderBy: { name: 'asc' },
       include: {
+        school: {
+          select: { id: true, name: true },
+        },
         parents: {
           include: {
             parent: {

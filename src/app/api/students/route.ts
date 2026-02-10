@@ -29,7 +29,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Enforce school isolation - users can only see students in their school
+    if (!session.user.schoolId) {
+      return NextResponse.json({ error: 'User must be assigned to a school' }, { status: 403 });
+    }
+
     const students = await prisma.student.findMany({
+      where: { schoolId: session.user.schoolId },
       include: {
         parents: {
           include: {

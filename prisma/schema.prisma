@@ -84,6 +84,7 @@ model User {
   reviewLogs       FormReviewLog[]
 
   @@index([schoolId])
+  @@index([schoolId, role])
   @@map("users")
 }
 
@@ -123,6 +124,7 @@ model Student {
   groups          StudentGroupMember[]
 
   @@index([schoolId])
+  @@index([schoolId, grade])
   @@map("students")
 }
 
@@ -205,6 +207,8 @@ model PermissionForm {
   @@index([teacherId, status])
   @@index([schoolId])
   @@index([reviewStatus])
+  @@index([deadline])
+  @@index([eventDate])
   @@map("permission_forms")
 }
 
@@ -261,6 +265,7 @@ model FormSubmission {
   @@index([parentId])
   @@index([studentId])
   @@index([formId, status])
+  @@index([formId, studentId])
   @@map("form_submissions")
 }
 
@@ -315,6 +320,7 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+  @@index([entityId])
   @@map("audit_logs")
 }
 

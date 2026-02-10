@@ -14,6 +14,7 @@ import {
   Shield,
   Menu,
   X,
+  GraduationCap,
 } from 'lucide-react';
 
 interface AdminNavProps {
@@ -27,6 +28,7 @@ export function AdminNav({ userName, isSuperAdmin }: AdminNavProps) {
   const navItems = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, superAdminOnly: false },
     { href: '/admin/schools', label: 'Schools', icon: Building2, superAdminOnly: false },
+    { href: '/admin/students', label: 'Students', icon: GraduationCap, superAdminOnly: false },
     { href: '/admin/invites', label: 'Invites', icon: Mail, superAdminOnly: false },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, superAdminOnly: false },
     { href: '/admin/import', label: 'Import', icon: Upload, superAdminOnly: false },
