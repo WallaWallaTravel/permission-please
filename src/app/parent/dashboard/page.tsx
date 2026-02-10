@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { SignOutButton } from '@/components/shared/SignOutButton';
+import { MobileNav } from '@/components/shared/MobileNav';
 
 interface PageProps {
   searchParams: Promise<{ preview_school?: string }>;
@@ -110,8 +111,14 @@ export default async function ParentDashboardPage({ searchParams }: PageProps) {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">{user.name}</span>
+              <span className="hidden text-sm text-gray-600 sm:inline">{user.name}</span>
               <SignOutButton />
+              <MobileNav
+                links={[
+                  { href: '/parent/dashboard', label: 'Dashboard' },
+                  { href: '/parent/history', label: 'History' },
+                ]}
+              />
             </div>
           </div>
         </div>

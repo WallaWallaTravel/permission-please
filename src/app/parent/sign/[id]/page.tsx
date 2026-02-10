@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { SignatureCanvas } from '@/components/signatures/SignatureCanvas';
 import Link from 'next/link';
@@ -54,6 +54,20 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
   const [fieldResponses, setFieldResponses] = useState<Record<string, string>>({});
   const [agreed, setAgreed] = useState(false);
   const [documentAcks, setDocumentAcks] = useState<Record<string, boolean>>({});
+  const signatureContainerRef = useRef<HTMLDivElement>(null);
+  const [canvasWidth, setCanvasWidth] = useState(480);
+
+  useEffect(() => {
+    function updateCanvasWidth() {
+      if (signatureContainerRef.current) {
+        // Use container width minus padding (48px = 24px each side)
+        setCanvasWidth(Math.min(480, signatureContainerRef.current.clientWidth - 48));
+      }
+    }
+    updateCanvasWidth();
+    window.addEventListener('resize', updateCanvasWidth);
+    return () => window.removeEventListener('resize', updateCanvasWidth);
+  }, []);
 
   useEffect(() => {
     async function loadForm() {
@@ -299,7 +313,12 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <h3 className="mb-3 flex items-center gap-2 font-semibold text-amber-900">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                   Required Documents ({form.documents.length})
                 </h3>
@@ -312,8 +331,18 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3">
                           <div className="rounded-lg bg-red-100 p-2">
-                            <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            <svg
+                              className="h-5 w-5 text-red-600"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                              />
                             </svg>
                           </div>
                           <div>
@@ -322,7 +351,11 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
                               <p className="mt-1 text-sm text-gray-600">{doc.description}</p>
                             )}
                             <span className="mt-1 inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                              {doc.source === 'external' ? 'External Venue' : doc.source === 'school' ? 'School Document' : 'District Policy'}
+                              {doc.source === 'external'
+                                ? 'External Venue'
+                                : doc.source === 'school'
+                                  ? 'School Document'
+                                  : 'District Policy'}
                             </span>
                           </div>
                         </div>
@@ -511,18 +544,14 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
             )}
 
             {/* Signature Section */}
-            <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg">
+            <div ref={signatureContainerRef} className="mb-6 rounded-2xl bg-white p-6 shadow-lg">
               <h3 className="mb-4 font-semibold text-gray-900">Your Signature</h3>
               <p className="mb-4 text-sm text-gray-600">
                 By signing below, I grant permission for <strong>{selectedStudent.name}</strong> to
                 participate in the above activity. I understand and accept all terms and conditions.
               </p>
 
-              <SignatureCanvas
-                onSignatureChange={setSignature}
-                width={Math.min(480, typeof window !== 'undefined' ? window.innerWidth - 80 : 480)}
-                height={180}
-              />
+              <SignatureCanvas onSignatureChange={setSignature} width={canvasWidth} height={180} />
 
               {/* Agreement Checkbox */}
               <label className="mt-6 flex cursor-pointer items-start gap-3">
@@ -591,4 +620,3 @@ export default function SignFormPage({ params }: { params: Promise<{ id: string 
     </div>
   );
 }
-

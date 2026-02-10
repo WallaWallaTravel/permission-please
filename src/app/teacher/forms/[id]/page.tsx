@@ -74,7 +74,12 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [submittingForReview, setSubmittingForReview] = useState(false);
+  const [showDeadlineExtend, setShowDeadlineExtend] = useState(false);
+  const [newDeadline, setNewDeadline] = useState('');
+  const [extendingDeadline, setExtendingDeadline] = useState(false);
 
   useEffect(() => {
     async function loadForm() {
@@ -183,6 +188,77 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const handleDuplicate = async () => {
+    if (
+      !confirm(
+        'Duplicate this form? A new DRAFT copy will be created with all fields and documents.'
+      )
+    ) {
+      return;
+    }
+
+    setDuplicating(true);
+    try {
+      const res = await fetch(`/api/forms/${id}/duplicate`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to duplicate form');
+      const result = await res.json();
+      router.push(`/teacher/forms/${result.form.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to duplicate');
+      setDuplicating(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    setExportingCsv(true);
+    try {
+      const res = await fetch(`/api/forms/${id}/export-csv`);
+      if (!res.ok) throw new Error('Failed to export CSV');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download =
+        res.headers.get('Content-Disposition')?.split('filename="')[1]?.replace('"', '') ||
+        'submissions.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export');
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
+  const handleExtendDeadline = async () => {
+    if (!newDeadline) return;
+
+    setExtendingDeadline(true);
+    try {
+      const res = await fetch(`/api/forms/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deadline: newDeadline }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to extend deadline');
+      }
+
+      const formData = await res.json();
+      setData({ form: { ...data!.form, ...formData.form } });
+      setShowDeadlineExtend(false);
+      setNewDeadline('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to extend deadline');
+    } finally {
+      setExtendingDeadline(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50">
@@ -247,12 +323,13 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
             </Link>
           </div>
           <h1 className="font-bold text-gray-900">Permission Please 📝</h1>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <ShareFormButton formId={form.id} isOwner={isOwner} />
             {form.status === 'DRAFT' && isOwner && (
               <button
                 onClick={() => handleStatusChange('ACTIVE')}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                style={{ minHeight: '44px' }}
               >
                 Activate Form
               </button>
@@ -263,7 +340,8 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                 {isOwner && (
                   <button
                     onClick={() => handleStatusChange('CLOSED')}
-                    className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+                    className="rounded-lg bg-gray-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+                    style={{ minHeight: '44px' }}
                   >
                     Close Form
                   </button>
@@ -273,7 +351,8 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
             {form.status === 'CLOSED' && isOwner && eventDate > new Date() && (
               <button
                 onClick={() => handleStatusChange('ACTIVE')}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                style={{ minHeight: '44px' }}
               >
                 Reopen Form
               </button>
@@ -343,7 +422,7 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
 
           <div className="p-6">
             {/* Stats Row */}
-            <div className="mb-6 grid grid-cols-4 gap-4">
+            <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div className="group relative rounded-lg bg-gray-50 p-4 text-center">
                 <p className="text-3xl font-bold text-gray-900">{totalSubmissions}</p>
                 <p className="text-sm text-gray-500">Total Sent</p>
@@ -377,7 +456,7 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Dates */}
-            <div className="mb-6 grid grid-cols-2 gap-4">
+            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="rounded-lg border border-gray-200 p-4">
                 <p className="mb-1 text-sm text-gray-500">📅 Event Date</p>
                 <p className="font-semibold text-gray-900">
@@ -399,6 +478,48 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                     year: 'numeric',
                   })}
                 </p>
+                {isOwner && form.status !== 'CLOSED' && (
+                  <>
+                    {!showDeadlineExtend ? (
+                      <button
+                        onClick={() => {
+                          setShowDeadlineExtend(true);
+                          setNewDeadline(form.deadline.split('T')[0]);
+                        }}
+                        className="mt-2 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+                      >
+                        Extend Deadline
+                      </button>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="date"
+                          value={newDeadline}
+                          onChange={(e) => setNewDeadline(e.target.value)}
+                          min={new Date().toISOString().split('T')[0]}
+                          className="rounded border border-gray-300 px-2 py-1 text-sm"
+                          aria-label="New deadline date"
+                        />
+                        <button
+                          onClick={handleExtendDeadline}
+                          disabled={extendingDeadline}
+                          className="rounded bg-emerald-600 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {extendingDeadline ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowDeadlineExtend(false);
+                            setNewDeadline('');
+                          }}
+                          className="rounded px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
@@ -616,8 +737,26 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* Submissions Table */}
         <div className="mb-6 overflow-hidden rounded-2xl bg-white shadow-lg">
-          <div className="border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h3 className="font-semibold text-gray-900">Signature Status</h3>
+            {form.submissions.length > 0 && (
+              <button
+                onClick={handleExportCsv}
+                disabled={exportingCsv}
+                className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                title="Export submissions to CSV"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                {exportingCsv ? 'Exporting...' : 'Export CSV'}
+              </button>
+            )}
           </div>
 
           {form.submissions.length === 0 ? (
@@ -735,19 +874,31 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-4">
             {isOwner && (
               <Link
                 href={`/teacher/forms/${form.id}/edit`}
-                className="font-medium text-gray-600 hover:text-gray-900"
+                className="py-2 font-medium text-gray-600 hover:text-gray-900"
+                style={{ minHeight: '44px' }}
               >
                 ✏️ Edit Form
               </Link>
             )}
+            {isOwner && (
+              <button
+                onClick={handleDuplicate}
+                disabled={duplicating}
+                className="py-2 font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50"
+                style={{ minHeight: '44px' }}
+              >
+                {duplicating ? 'Duplicating...' : '📋 Duplicate Form'}
+              </button>
+            )}
             <Link
               href={`/teacher/forms/${form.id}/print`}
-              className="font-medium text-gray-600 hover:text-gray-900"
+              className="py-2 font-medium text-gray-600 hover:text-gray-900"
+              style={{ minHeight: '44px' }}
             >
               🖨️ Print Form
             </Link>
@@ -756,7 +907,8 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+              className="py-2 font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+              style={{ minHeight: '44px' }}
             >
               {deleting ? 'Deleting...' : '🗑️ Delete Form'}
             </button>

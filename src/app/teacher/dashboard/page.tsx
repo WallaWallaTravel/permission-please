@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import { SignOutButton } from '@/components/shared/SignOutButton';
 import { DistributeButton } from '@/components/forms/DistributeButton';
+import { MobileNav } from '@/components/shared/MobileNav';
 
 interface PageProps {
   searchParams: Promise<{ preview_school?: string }>;
@@ -130,8 +131,16 @@ export default async function TeacherDashboardPage({ searchParams }: PageProps) 
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">{user.name}</span>
+              <span className="hidden text-sm text-gray-600 sm:inline">{user.name}</span>
               <SignOutButton />
+              <MobileNav
+                links={[
+                  { href: '/teacher/dashboard', label: 'Dashboard' },
+                  { href: '/teacher/forms', label: 'Forms' },
+                  { href: '/teacher/students', label: 'Students' },
+                  { href: '/teacher/groups', label: 'Groups' },
+                ]}
+              />
             </div>
           </div>
         </div>
@@ -139,16 +148,19 @@ export default async function TeacherDashboardPage({ searchParams }: PageProps) 
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Welcome Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">Welcome back, {user.name}! 👋</h2>
+            <h2 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+              Welcome back, {user.name}! 👋
+            </h2>
             <p className="mt-1 text-gray-600">
               Here&apos;s what&apos;s happening with your permission forms
             </p>
           </div>
           <Link
             href="/teacher/forms/create"
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-indigo-700"
+            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-indigo-700"
+            style={{ minHeight: '44px' }}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
