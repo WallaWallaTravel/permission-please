@@ -305,8 +305,8 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-4">
+        <div className="mx-auto max-w-6xl px-4 py-4">
+          <div className="flex items-center justify-between">
             <Link
               href="/teacher/dashboard"
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
@@ -319,11 +319,49 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                   d="M15 19l-7-7 7-7"
                 />
               </svg>
-              Dashboard
+              <span className="hidden sm:inline">Dashboard</span>
             </Link>
+            <h1 className="font-bold text-gray-900">Permission Please 📝</h1>
+            <div className="hidden items-center gap-3 sm:flex">
+              <ShareFormButton formId={form.id} isOwner={isOwner} />
+              {form.status === 'DRAFT' && isOwner && (
+                <button
+                  onClick={() => handleStatusChange('ACTIVE')}
+                  className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                  style={{ minHeight: '44px' }}
+                >
+                  Activate Form
+                </button>
+              )}
+              {form.status === 'ACTIVE' && (
+                <>
+                  <DistributeButton formId={form.id} />
+                  {isOwner && (
+                    <button
+                      onClick={() => handleStatusChange('CLOSED')}
+                      className="rounded-lg bg-gray-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+                      style={{ minHeight: '44px' }}
+                    >
+                      Close Form
+                    </button>
+                  )}
+                </>
+              )}
+              {form.status === 'CLOSED' && isOwner && eventDate > new Date() && (
+                <button
+                  onClick={() => handleStatusChange('ACTIVE')}
+                  className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                  style={{ minHeight: '44px' }}
+                >
+                  Reopen Form
+                </button>
+              )}
+            </div>
+            {/* Spacer for centering title on mobile */}
+            <div className="w-5 sm:hidden" />
           </div>
-          <h1 className="font-bold text-gray-900">Permission Please 📝</h1>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Mobile action buttons - second row */}
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2 sm:hidden">
             <ShareFormButton formId={form.id} isOwner={isOwner} />
             {form.status === 'DRAFT' && isOwner && (
               <button
@@ -331,7 +369,7 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                 className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
                 style={{ minHeight: '44px' }}
               >
-                Activate Form
+                Activate
               </button>
             )}
             {form.status === 'ACTIVE' && (
@@ -343,7 +381,7 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                     className="rounded-lg bg-gray-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
                     style={{ minHeight: '44px' }}
                   >
-                    Close Form
+                    Close
                   </button>
                 )}
               </>
@@ -354,7 +392,7 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                 className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
                 style={{ minHeight: '44px' }}
               >
-                Reopen Form
+                Reopen
               </button>
             )}
           </div>
