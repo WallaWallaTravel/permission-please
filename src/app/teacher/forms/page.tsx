@@ -55,11 +55,15 @@ export default async function TeacherFormsPage({ searchParams }: PageProps) {
     _count: true,
   });
 
+  const draftCount = statusCounts.find((s) => s.status === 'DRAFT')?._count || 0;
+  const activeCount = statusCounts.find((s) => s.status === 'ACTIVE')?._count || 0;
+  const closedCount = statusCounts.find((s) => s.status === 'CLOSED')?._count || 0;
+
   const counts = {
-    ALL: forms.length,
-    DRAFT: statusCounts.find((s) => s.status === 'DRAFT')?._count || 0,
-    ACTIVE: statusCounts.find((s) => s.status === 'ACTIVE')?._count || 0,
-    CLOSED: statusCounts.find((s) => s.status === 'CLOSED')?._count || 0,
+    ALL: draftCount + activeCount + closedCount,
+    DRAFT: draftCount,
+    ACTIVE: activeCount,
+    CLOSED: closedCount,
   };
 
   const currentFilter = status || 'ALL';
