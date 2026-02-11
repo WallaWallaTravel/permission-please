@@ -44,3 +44,4 @@ next-env.d.ts
 
 # working docs
 /claudedocs
+.env*.local
