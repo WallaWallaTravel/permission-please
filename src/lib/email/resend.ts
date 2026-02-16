@@ -5,6 +5,9 @@ import { PermissionRequestEmail } from '@/emails/PermissionRequestEmail';
 import { SignatureConfirmationEmail } from '@/emails/SignatureConfirmationEmail';
 import { ReminderEmail } from '@/emails/ReminderEmail';
 import { MagicLinkEmail } from '@/emails/MagicLinkEmail';
+import { ReviewSubmittedEmail } from '@/emails/ReviewSubmittedEmail';
+import { FormApprovedEmail } from '@/emails/FormApprovedEmail';
+import { RevisionRequestedEmail } from '@/emails/RevisionRequestedEmail';
 
 // Lazy-initialize Resend client to avoid build errors when API key is not set
 let resendClient: Resend | null = null;
@@ -142,8 +145,9 @@ export async function sendReminder({
   hoursRemaining,
 }: SendReminderParams) {
   // Determine urgency based on time remaining
-  const isUrgent = (hoursRemaining !== undefined && hoursRemaining <= 24) ||
-                   (daysRemaining !== undefined && daysRemaining <= 1);
+  const isUrgent =
+    (hoursRemaining !== undefined && hoursRemaining <= 24) ||
+    (daysRemaining !== undefined && daysRemaining <= 1);
   const urgency = isUrgent ? 'URGENT' : 'Reminder';
   const timeText = formatTimeRemaining(daysRemaining, hoursRemaining);
 
@@ -269,11 +273,7 @@ interface SendMagicLinkParams {
   magicLinkUrl: string;
 }
 
-export async function sendMagicLinkEmail({
-  email,
-  name,
-  magicLinkUrl,
-}: SendMagicLinkParams) {
+export async function sendMagicLinkEmail({ email, name, magicLinkUrl }: SendMagicLinkParams) {
   const html = await render(
     MagicLinkEmail({
       name,
@@ -480,3 +480,203 @@ Permission Please
   return data;
 }
 
+interface SendReviewSubmittedParams {
+  reviewerEmail: string;
+  reviewerName: string;
+  teacherName: string;
+  formTitle: string;
+  eventDate: Date;
+  schoolName?: string;
+  isExpedited?: boolean;
+  reviewNeededBy?: Date;
+  reviewUrl: string;
+}
+
+export async function sendReviewSubmittedEmail({
+  reviewerEmail,
+  reviewerName,
+  teacherName,
+  formTitle,
+  eventDate,
+  schoolName = 'School',
+  isExpedited = false,
+  reviewNeededBy,
+  reviewUrl,
+}: SendReviewSubmittedParams) {
+  const html = await render(
+    ReviewSubmittedEmail({
+      reviewerName,
+      teacherName,
+      formTitle,
+      eventDate: formatDate(eventDate),
+      schoolName,
+      isExpedited,
+      reviewNeededBy: reviewNeededBy ? formatDate(reviewNeededBy) : undefined,
+      reviewUrl,
+    })
+  );
+
+  const subject = isExpedited
+    ? `EXPEDITED: New form for review - ${formTitle}`
+    : `New form for review - ${formTitle}`;
+
+  const text = `
+${isExpedited ? 'EXPEDITED REVIEW REQUESTED\n\n' : ''}Hi ${reviewerName},
+
+${teacherName} has submitted a permission form for your review.
+
+Form: ${formTitle}
+Event Date: ${formatDate(eventDate)}
+${reviewNeededBy ? `Review Needed By: ${formatDate(reviewNeededBy)}\n` : ''}
+Click here to review: ${reviewUrl}
+
+---
+Permission Please
+  `.trim();
+
+  const { data, error } = await getResendClient().emails.send({
+    from: FROM_EMAIL,
+    to: reviewerEmail,
+    subject,
+    html,
+    text,
+  });
+
+  if (error) {
+    logger.error('Failed to send review submitted email', error);
+    throw new Error(`Failed to send review submitted email: ${error.message}`);
+  }
+
+  return data;
+}
+
+interface SendFormApprovedParams {
+  teacherEmail: string;
+  teacherName: string;
+  reviewerName: string;
+  formTitle: string;
+  eventDate: Date;
+  schoolName?: string;
+  comments?: string;
+  formUrl: string;
+}
+
+export async function sendFormApprovedEmail({
+  teacherEmail,
+  teacherName,
+  reviewerName,
+  formTitle,
+  eventDate,
+  schoolName = 'School',
+  comments,
+  formUrl,
+}: SendFormApprovedParams) {
+  const html = await render(
+    FormApprovedEmail({
+      teacherName,
+      reviewerName,
+      formTitle,
+      eventDate: formatDate(eventDate),
+      schoolName,
+      comments: comments || undefined,
+      formUrl,
+    })
+  );
+
+  const text = `
+Form Approved!
+
+Hi ${teacherName},
+
+Your permission form "${formTitle}" has been approved by ${reviewerName}. You can now activate and distribute it to parents.
+
+Event Date: ${formatDate(eventDate)}
+${comments ? `\nReviewer Comments: ${comments}\n` : ''}
+Click here to view: ${formUrl}
+
+---
+Permission Please
+  `.trim();
+
+  const { data, error } = await getResendClient().emails.send({
+    from: FROM_EMAIL,
+    to: teacherEmail,
+    subject: `Form Approved: ${formTitle}`,
+    html,
+    text,
+  });
+
+  if (error) {
+    logger.error('Failed to send form approved email', error);
+    throw new Error(`Failed to send form approved email: ${error.message}`);
+  }
+
+  return data;
+}
+
+interface SendRevisionRequestedParams {
+  teacherEmail: string;
+  teacherName: string;
+  reviewerName: string;
+  formTitle: string;
+  eventDate: Date;
+  schoolName?: string;
+  comments: string;
+  formUrl: string;
+}
+
+export async function sendRevisionRequestedEmail({
+  teacherEmail,
+  teacherName,
+  reviewerName,
+  formTitle,
+  eventDate,
+  schoolName = 'School',
+  comments,
+  formUrl,
+}: SendRevisionRequestedParams) {
+  const html = await render(
+    RevisionRequestedEmail({
+      teacherName,
+      reviewerName,
+      formTitle,
+      eventDate: formatDate(eventDate),
+      schoolName,
+      comments,
+      formUrl,
+    })
+  );
+
+  const text = `
+Revision Requested
+
+Hi ${teacherName},
+
+${reviewerName} has reviewed your permission form "${formTitle}" and is requesting changes.
+
+Event Date: ${formatDate(eventDate)}
+
+Reviewer Feedback:
+${comments}
+
+Click here to edit: ${formUrl}
+
+---
+Permission Please
+  `.trim();
+
+  const { data, error } = await getResendClient().emails.send({
+    from: FROM_EMAIL,
+    to: teacherEmail,
+    subject: `Revision Requested: ${formTitle}`,
+    html,
+    text,
+  });
+
+  if (error) {
+    logger.error('Failed to send revision requested email', error);
+    throw new Error(`Failed to send revision requested email: ${error.message}`);
+  }
+
+  return data;
+}

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { sendReviewSubmittedEmail } from '@/lib/email/resend';
 
 // POST - Submit form for review
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -75,8 +76,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     });
 
-    // TODO: Send email notification to reviewers at the school
-    // This would notify all users with REVIEWER role at the school
+    // Notify reviewers at the school (fire-and-forget)
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:6001';
+    try {
+      const reviewers = await prisma.user.findMany({
+        where: {
+          role: 'REVIEWER',
+          schoolId: form.schoolId,
+        },
+        select: { email: true, name: true },
+      });
+
+      const emailPromises = reviewers.map((reviewer) =>
+        sendReviewSubmittedEmail({
+          reviewerEmail: reviewer.email,
+          reviewerName: reviewer.name || 'Reviewer',
+          teacherName: form.teacher.name || 'Teacher',
+          formTitle: form.title,
+          eventDate: form.eventDate,
+          schoolName: form.school?.name,
+          isExpedited: isExpedited || false,
+          reviewNeededBy: reviewNeededBy ? new Date(reviewNeededBy) : undefined,
+          reviewUrl: `${baseUrl}/reviewer/forms/${id}`,
+        }).catch((err) => logger.error('Failed to notify reviewer', err as Error))
+      );
+      await Promise.allSettled(emailPromises);
+    } catch (err) {
+      logger.error('Failed to fetch reviewers for notification', err as Error);
+    }
 
     return NextResponse.json({
       success: true,

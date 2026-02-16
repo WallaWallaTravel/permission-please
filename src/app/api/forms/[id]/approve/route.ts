@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { sendFormApprovedEmail } from '@/lib/email/resend';
 
 // POST - Approve form (reviewer only)
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -76,7 +77,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     });
 
-    // TODO: Send email notification to the teacher that form was approved
+    // Notify the teacher (fire-and-forget)
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:6001';
+    sendFormApprovedEmail({
+      teacherEmail: form.teacher.email,
+      teacherName: form.teacher.name || 'Teacher',
+      reviewerName: session.user.name || 'Reviewer',
+      formTitle: form.title,
+      eventDate: form.eventDate,
+      schoolName: form.school?.name,
+      comments: comments || undefined,
+      formUrl: `${baseUrl}/teacher/forms/${id}`,
+    }).catch((err) => logger.error('Failed to send form approved email', err as Error));
 
     return NextResponse.json({
       success: true,

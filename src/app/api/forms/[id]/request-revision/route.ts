@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { sendRevisionRequestedEmail } from '@/lib/email/resend';
 
 const requestRevisionSchema = z.object({
   comments: z.string().min(1, 'Please provide feedback about what needs to be changed'),
@@ -82,7 +83,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     });
 
-    // TODO: Send email notification to the teacher about required changes
+    // Notify the teacher (fire-and-forget)
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:6001';
+    sendRevisionRequestedEmail({
+      teacherEmail: form.teacher.email,
+      teacherName: form.teacher.name || 'Teacher',
+      reviewerName: session.user.name || 'Reviewer',
+      formTitle: form.title,
+      eventDate: form.eventDate,
+      schoolName: form.school?.name,
+      comments,
+      formUrl: `${baseUrl}/teacher/forms/${id}`,
+    }).catch((err) => logger.error('Failed to send revision requested email', err as Error));
 
     return NextResponse.json({
       success: true,
