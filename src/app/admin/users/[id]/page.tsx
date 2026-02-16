@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -73,11 +73,7 @@ export default function UserEditPage({ params }: { params: Promise<{ id: string 
   const [role, setRole] = useState('');
   const [schoolId, setSchoolId] = useState<string>('');
 
-  useEffect(() => {
-    fetchData();
-  }, [id]);
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
       const [userRes, schoolsRes] = await Promise.all([
         fetch(`/api/admin/users/${id}`),
@@ -108,7 +104,11 @@ export default function UserEditPage({ params }: { params: Promise<{ id: string 
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [id, router]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   async function handleSave() {
     setIsSaving(true);

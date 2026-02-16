@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Search, UserPlus, GraduationCap } from 'lucide-react';
@@ -50,11 +50,7 @@ export default function LinkStudentPage({ params }: { params: Promise<{ id: stri
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [relationship, setRelationship] = useState('Parent/Guardian');
 
-  useEffect(() => {
-    fetchData();
-  }, [userId]);
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
       const [userRes, studentsRes] = await Promise.all([
         fetch(`/api/admin/users/${userId}`),
@@ -90,7 +86,11 @@ export default function LinkStudentPage({ params }: { params: Promise<{ id: stri
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [userId, router]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   async function handleLink() {
     if (!selectedStudentId) return;

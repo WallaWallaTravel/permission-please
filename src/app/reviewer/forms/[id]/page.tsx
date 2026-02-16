@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -82,24 +82,7 @@ export default function ReviewerFormPage({ params }: { params: Promise<{ id: str
   const [editDescription, setEditDescription] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (status === 'loading') return;
-
-    if (!session?.user) {
-      router.push('/login');
-      return;
-    }
-
-    if (session.user.role !== 'REVIEWER') {
-      router.push('/');
-      return;
-    }
-
-    loadForm();
-    loadReviewLogs();
-  }, [session, status, router, id]);
-
-  async function loadForm() {
+  const loadForm = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/forms/${id}`);
@@ -124,9 +107,9 @@ export default function ReviewerFormPage({ params }: { params: Promise<{ id: str
     } finally {
       setLoading(false);
     }
-  }
+  }, [id, router]);
 
-  async function loadReviewLogs() {
+  const loadReviewLogs = useCallback(async () => {
     try {
       const res = await fetch(`/api/forms/${id}/review-log`);
       if (res.ok) {
@@ -136,7 +119,24 @@ export default function ReviewerFormPage({ params }: { params: Promise<{ id: str
     } catch {
       // Non-critical, don't show error
     }
-  }
+  }, [id]);
+
+  useEffect(() => {
+    if (status === 'loading') return;
+
+    if (!session?.user) {
+      router.push('/login');
+      return;
+    }
+
+    if (session.user.role !== 'REVIEWER') {
+      router.push('/');
+      return;
+    }
+
+    loadForm();
+    loadReviewLogs();
+  }, [session, status, router, id, loadForm, loadReviewLogs]);
 
   async function handleApprove() {
     setSubmitting(true);

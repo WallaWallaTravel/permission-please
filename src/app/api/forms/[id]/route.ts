@@ -192,7 +192,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Use a transaction to update form, fields, and documents atomically
     const form = await prisma.$transaction(async (tx) => {
       // Update form metadata first
-      const updatedForm = await tx.permissionForm.update({
+      await tx.permissionForm.update({
         where: { id },
         data: {
           ...(validatedData.title && { title: validatedData.title }),

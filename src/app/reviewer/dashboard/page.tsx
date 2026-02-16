@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -48,23 +48,7 @@ export default function ReviewerDashboardPage() {
     'pending'
   );
 
-  useEffect(() => {
-    if (status === 'loading') return;
-
-    if (!session?.user) {
-      router.push('/login');
-      return;
-    }
-
-    if (session.user.role !== 'REVIEWER') {
-      router.push('/');
-      return;
-    }
-
-    loadForms();
-  }, [session, status, router, statusFilter]);
-
-  async function loadForms() {
+  const loadForms = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/reviewer/forms?status=${statusFilter}`);
@@ -86,7 +70,23 @@ export default function ReviewerDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [statusFilter, router]);
+
+  useEffect(() => {
+    if (status === 'loading') return;
+
+    if (!session?.user) {
+      router.push('/login');
+      return;
+    }
+
+    if (session.user.role !== 'REVIEWER') {
+      router.push('/');
+      return;
+    }
+
+    loadForms();
+  }, [session, status, router, loadForms]);
 
   if (status === 'loading' || loading) {
     return (

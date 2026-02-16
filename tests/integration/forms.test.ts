@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import { mockPrismaClient, resetPrismaMocks, mockDataFactory } from '../helpers/mock-prisma';
 import { mockTeacherSession, mockParentSession } from '../helpers/mock-session';
 
@@ -207,7 +208,7 @@ describe('GET /api/forms/[id]', () => {
     mockGetCurrentUser.mockResolvedValue(mockTeacherSession.user);
     mockPrismaClient.permissionForm.findUnique.mockResolvedValue(null);
 
-    const request = new Request('http://localhost:6001/api/forms/nonexistent');
+    const request = new NextRequest('http://localhost:6001/api/forms/nonexistent');
     const response = await GET(request, { params: Promise.resolve({ id: 'nonexistent' }) });
     const data = await response.json();
 
@@ -222,7 +223,7 @@ describe('GET /api/forms/[id]', () => {
     const form = mockDataFactory.permissionForm({ teacherId: mockTeacherSession.user.id });
     mockPrismaClient.permissionForm.findUnique.mockResolvedValue(form);
 
-    const request = new Request('http://localhost:6001/api/forms/form-123');
+    const request = new NextRequest('http://localhost:6001/api/forms/form-123');
     const response = await GET(request, { params: Promise.resolve({ id: 'form-123' }) });
     const data = await response.json();
 
@@ -238,7 +239,7 @@ describe('GET /api/forms/[id]', () => {
     mockPrismaClient.permissionForm.findUnique.mockResolvedValue(form);
     mockPrismaClient.formShare.findUnique.mockResolvedValue(null); // No share access
 
-    const request = new Request('http://localhost:6001/api/forms/form-123');
+    const request = new NextRequest('http://localhost:6001/api/forms/form-123');
     const response = await GET(request, { params: Promise.resolve({ id: 'form-123' }) });
 
     expect(response.status).toBe(403);
@@ -259,7 +260,9 @@ describe('DELETE /api/forms/[id]', () => {
     mockPrismaClient.permissionForm.findUnique.mockResolvedValue(form);
     mockPrismaClient.permissionForm.delete.mockResolvedValue(form);
 
-    const request = new Request('http://localhost:6001/api/forms/form-123', { method: 'DELETE' });
+    const request = new NextRequest('http://localhost:6001/api/forms/form-123', {
+      method: 'DELETE',
+    });
     const response = await DELETE(request, { params: Promise.resolve({ id: 'form-123' }) });
     const data = await response.json();
 
@@ -274,7 +277,9 @@ describe('DELETE /api/forms/[id]', () => {
     const form = mockDataFactory.permissionForm({ teacherId: 'other-teacher-id' });
     mockPrismaClient.permissionForm.findUnique.mockResolvedValue(form);
 
-    const request = new Request('http://localhost:6001/api/forms/form-123', { method: 'DELETE' });
+    const request = new NextRequest('http://localhost:6001/api/forms/form-123', {
+      method: 'DELETE',
+    });
     const response = await DELETE(request, { params: Promise.resolve({ id: 'form-123' }) });
 
     expect(response.status).toBe(403);

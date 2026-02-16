@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Save, Trash2, UserPlus, X } from 'lucide-react';
@@ -54,11 +54,7 @@ export default function StudentEditPage({ params }: { params: Promise<{ id: stri
   const [grade, setGrade] = useState('');
   const [schoolId, setSchoolId] = useState<string>('');
 
-  useEffect(() => {
-    fetchData();
-  }, [id]);
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
       const [studentRes, schoolsRes, userRes] = await Promise.all([
         fetch(`/api/admin/students/${id}`),
@@ -94,7 +90,11 @@ export default function StudentEditPage({ params }: { params: Promise<{ id: stri
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [id, router]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   async function handleSave() {
     setIsSaving(true);

@@ -36,7 +36,11 @@ const mockAdminSession = {
 };
 
 // Store current session for dynamic mocking
-let currentSession: typeof mockTeacherSession | null = null;
+let currentSession:
+  | typeof mockTeacherSession
+  | typeof mockParentSession
+  | typeof mockAdminSession
+  | null = null;
 
 // Mock Prisma
 vi.mock('@/lib/db', () => ({
