@@ -59,7 +59,7 @@ export default function StandUpSchoolPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to stand up school');
+        throw new Error(data.error || 'Failed to set up school');
       }
 
       setEmailSent(Boolean(data.emailSent));
@@ -118,7 +118,7 @@ export default function StandUpSchoolPage() {
               }}
               className="rounded-lg border border-gray-200 px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50"
             >
-              Stand up another
+              Set up another
             </button>
           </div>
         </div>
@@ -137,7 +137,7 @@ export default function StandUpSchoolPage() {
       </Link>
 
       <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h1 className="mb-2 text-2xl font-bold text-gray-900">Stand up a school</h1>
+        <h1 className="mb-2 text-2xl font-bold text-gray-900">Set up a school</h1>
         <p className="mb-6 text-gray-600">
           Creates the school, sets the annual license, and emails the first admin. You invoice
           outside this app.

@@ -37,7 +37,7 @@ export default async function SchoolsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Schools</h1>
           <p className="mt-1 text-gray-600">
-            Stand up a school, set the license, invite the first admin
+            Set up a school, set the license, invite the first admin
           </p>
         </div>
         {isSuperAdmin && (
@@ -46,7 +46,7 @@ export default async function SchoolsPage() {
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
           >
             <Plus className="h-5 w-5" />
-            Stand up a school
+            Set up a school
           </Link>
         )}
       </div>
@@ -56,7 +56,7 @@ export default async function SchoolsPage() {
           <Building2 className="mx-auto mb-4 h-16 w-16 text-gray-300" />
           <h2 className="mb-2 text-xl font-semibold text-gray-900">No schools yet</h2>
           <p className="mx-auto mb-6 max-w-md text-gray-500">
-            Stand up a school to set the annual license and invite the first admin.
+            Set up a school to set the annual license and invite the first admin.
           </p>
           {isSuperAdmin && (
             <Link
@@ -64,7 +64,7 @@ export default async function SchoolsPage() {
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
             >
               <Plus className="h-5 w-5" />
-              Stand up your first school
+              Set up your first school
             </Link>
           )}
         </div>

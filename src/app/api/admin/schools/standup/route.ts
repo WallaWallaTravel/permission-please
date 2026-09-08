@@ -146,6 +146,6 @@ export async function POST(request: NextRequest) {
     }
 
     logger.error('Error standing up school', error as Error);
-    return NextResponse.json({ error: 'Failed to stand up school' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to set up school' }, { status: 500 });
   }
 }
