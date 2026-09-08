@@ -25,11 +25,8 @@ export const AnalyticsEvents = {
   SIGNATURE_DECLINED: 'signature_declined',
 
   // User events
-  USER_SIGNUP: 'user_signup',
   USER_LOGIN: 'user_login',
   USER_LOGOUT: 'user_logout',
-  PASSWORD_RESET_REQUESTED: 'password_reset_requested',
-  PASSWORD_RESET_COMPLETED: 'password_reset_completed',
 
   // Student management
   STUDENT_ADDED: 'student_added',
@@ -54,7 +51,10 @@ export type AnalyticsEvent = (typeof AnalyticsEvents)[keyof typeof AnalyticsEven
 /**
  * Track a custom event with optional properties
  */
-export function trackEvent(event: AnalyticsEvent, properties?: Record<string, string | number | boolean>) {
+export function trackEvent(
+  event: AnalyticsEvent,
+  properties?: Record<string, string | number | boolean>
+) {
   try {
     track(event, properties);
   } catch (error) {
@@ -108,10 +108,6 @@ export function trackSignatureCompleted(formId: string, studentId: string) {
 // ============================================================================
 // User Events
 // ============================================================================
-
-export function trackUserSignup(role: string) {
-  trackEvent(AnalyticsEvents.USER_SIGNUP, { role });
-}
 
 export function trackUserLogin(role: string) {
   trackEvent(AnalyticsEvents.USER_LOGIN, { role });

@@ -8,7 +8,7 @@ import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { parseLicenseDate } from '@/lib/auth/license';
 
-const standupSchema = z.object({
+const setUpSchoolSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
   subdomain: z
     .string()
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const data = standupSchema.parse(body);
+    const data = setUpSchoolSchema.parse(body);
     const subdomain = data.subdomain.toLowerCase();
     const licensedThrough = parseLicenseDate(data.licensedThrough);
 
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       });
       emailSent = true;
     } catch (emailError) {
-      logger.error('Failed to send standup invite email', emailError as Error);
+      logger.error('Failed to send school setup invite email', emailError as Error);
     }
 
     return NextResponse.json(
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logger.error('Error standing up school', error as Error);
+    logger.error('Error setting up school', error as Error);
     return NextResponse.json({ error: 'Failed to set up school' }, { status: 500 });
   }
 }

@@ -12,7 +12,6 @@ export type AuditAction =
   // Authentication
   | 'USER_LOGIN'
   | 'USER_LOGOUT'
-  | 'USER_SIGNUP'
   | 'GOOGLE_LOGIN'
   | 'MAGIC_LINK_REQUEST'
   | 'MAGIC_LINK_VERIFY'
@@ -57,7 +56,6 @@ interface AuditLogParams {
 const actionSeverity: Record<AuditAction, AuditSeverity> = {
   USER_LOGIN: 'low',
   USER_LOGOUT: 'low',
-  USER_SIGNUP: 'medium',
   GOOGLE_LOGIN: 'low',
   MAGIC_LINK_REQUEST: 'medium',
   MAGIC_LINK_VERIFY: 'medium',

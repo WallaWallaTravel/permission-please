@@ -84,13 +84,6 @@ export const mockPrismaClient = {
     upsert: vi.fn(),
     update: vi.fn(),
   },
-  passwordResetToken: {
-    findUnique: vi.fn(),
-    findFirst: vi.fn(),
-    create: vi.fn(),
-    delete: vi.fn(),
-    deleteMany: vi.fn(),
-  },
   $connect: vi.fn(),
   $disconnect: vi.fn(),
   $queryRaw: vi.fn(),
@@ -225,15 +218,6 @@ export const mockDataFactory = {
     createdById: 'admin-123',
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
     usedAt: null,
-    createdAt: new Date(),
-    ...overrides,
-  }),
-
-  passwordResetToken: (overrides = {}) => ({
-    id: 'reset-123',
-    email: 'user@example.com',
-    token: 'reset-token-abc123',
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
     createdAt: new Date(),
     ...overrides,
   }),

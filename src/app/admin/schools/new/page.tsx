@@ -10,7 +10,7 @@ function defaultLicenseDate(): string {
   return date.toISOString().slice(0, 10);
 }
 
-export default function StandUpSchoolPage() {
+export default function SetUpSchoolPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);

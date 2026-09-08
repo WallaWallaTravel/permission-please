@@ -29,9 +29,8 @@ function LoginForm() {
       );
     } else if (urlError === 'OAuthAccountNotLinked') {
       setError(
-        'This email is already associated with another sign-in method. Try using a magic link instead.'
+        'This email is already associated with another sign-in method. Try Google again, or contact your school administrator.'
       );
-      setLoginMode('magic-link');
     } else if (urlError === 'DatabaseError') {
       setError('Unable to connect to the database. Please try again in a few moments.');
     } else if (urlError) {
@@ -233,8 +232,8 @@ function LoginForm() {
               <form onSubmit={handleMagicLink} className="space-y-6">
                 <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
                   <p className="text-sm text-blue-700">
-                    <strong>Alternative login:</strong> Enter your email to receive a secure login
-                    link. No password needed!
+                    <strong>Email link:</strong> Enter your email and we will send a short-lived
+                    sign-in link.
                   </p>
                 </div>
 

@@ -42,6 +42,11 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# local scratch
+/test-results
+/playwright-report
+test-db.ts
+
 # working docs
 /claudedocs
 .env*.local
