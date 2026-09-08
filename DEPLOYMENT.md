@@ -22,6 +22,7 @@ This guide covers deploying Permission Please to production using Vercel and Sup
    - **Direct connection** → `DIRECT_URL`
 
 Example format:
+
 ```bash
 DATABASE_URL="postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-0-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
 DIRECT_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/postgres"
@@ -39,21 +40,22 @@ DIRECT_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/po
 
 Set these in Vercel Dashboard > Project Settings > Environment Variables:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | Supabase pooler connection string |
-| `DIRECT_URL` | Yes | Supabase direct connection string |
-| `NEXTAUTH_SECRET` | Yes | 32+ character random string |
-| `NEXTAUTH_URL` | Yes | Your production URL (e.g., `https://app.permissionplease.app`) |
-| `RESEND_API_KEY` | No* | Resend API key for emails |
-| `FROM_EMAIL` | No | Sender email (e.g., `noreply@yourdomain.com`) |
-| `CRON_SECRET` | Yes | Secret for cron job authentication |
-| `SENTRY_DSN` | No | Sentry DSN for error tracking |
-| `NEXT_PUBLIC_SENTRY_DSN` | No | Same as SENTRY_DSN (for client-side) |
+| Variable                 | Required | Description                                                    |
+| ------------------------ | -------- | -------------------------------------------------------------- |
+| `DATABASE_URL`           | Yes      | Supabase pooler connection string                              |
+| `DIRECT_URL`             | Yes      | Supabase direct connection string                              |
+| `NEXTAUTH_SECRET`        | Yes      | 32+ character random string                                    |
+| `NEXTAUTH_URL`           | Yes      | Your production URL (e.g., `https://app.permissionplease.app`) |
+| `RESEND_API_KEY`         | No\*     | Resend API key for emails                                      |
+| `FROM_EMAIL`             | No       | Sender email (e.g., `noreply@yourdomain.com`)                  |
+| `CRON_SECRET`            | Yes      | Secret for cron job authentication                             |
+| `SENTRY_DSN`             | No       | Sentry DSN for error tracking                                  |
+| `NEXT_PUBLIC_SENTRY_DSN` | No       | Same as SENTRY_DSN (for client-side)                           |
 
-*Without `RESEND_API_KEY`, emails won't be sent but the app will still work.
+\*Without `RESEND_API_KEY`, emails won't be sent but the app will still work.
 
 **Generate secrets:**
+
 ```bash
 # NEXTAUTH_SECRET
 openssl rand -base64 32
@@ -72,21 +74,30 @@ npm run db:migrate:deploy
 ```
 
 Or use Vercel's build command to run migrations automatically:
+
 ```json
 {
   "buildCommand": "prisma migrate deploy && next build"
 }
 ```
 
-### 5. Create First Admin User
+### 5. Create First Super Admin
 
-1. Go to your deployed app's `/signup` page
-2. Create an account with your email
-3. Connect to the database and update the role:
+There is no `/signup` page. Insert a `SUPER_ADMIN` user, then sign in with Google using that email:
 
 ```sql
-UPDATE "User" SET role = 'SUPER_ADMIN' WHERE email = 'your-email@example.com';
+INSERT INTO users (id, email, name, role, created_at, updated_at)
+VALUES (
+  'bootstrap-super-admin',
+  'you@permissionplease.app',
+  'You',
+  'SUPER_ADMIN'::"Role",
+  NOW(),
+  NOW()
+);
 ```
+
+Then open `/login` and continue with Google. After that, set up schools from **Admin > Schools > Set up a school**.
 
 ## Production Checklist
 
@@ -124,8 +135,8 @@ The app uses Vercel Cron for scheduled tasks. These are configured in `vercel.js
 {
   "crons": [
     {
-      "path": "/api/cron/send-reminders",
-      "schedule": "0 8 * * *"
+      "path": "/api/cron/reminders",
+      "schedule": "0 9 * * *"
     }
   ]
 }
@@ -146,21 +157,22 @@ Permission Please supports school subdomains (e.g., `school-name.permissionpleas
 
 ### Creating Schools
 
-1. Log in as SUPER_ADMIN or ADMIN
-2. Go to Admin > Schools > Add School
-3. Enter school name and subdomain
-4. The school portal is now accessible at `{subdomain}.permissionplease.app`
+1. Log in as SUPER_ADMIN
+2. Go to Admin > Schools > Set up a school
+3. Enter the school name, license date, and first admin email
 
 ## Troubleshooting
 
 ### Database Connection Issues
 
 **Error: "Connection refused" or timeout**
+
 - Check that `DATABASE_URL` uses the pooler connection (port 6543)
 - Check that `DIRECT_URL` is set for migrations
 - Verify IP is not blocked in Supabase settings
 
 **Error: "Prepared statement already exists"**
+
 - Add `?pgbouncer=true` to your DATABASE_URL
 
 ### Email Not Sending

@@ -4,11 +4,10 @@
 
 ### 1. **Authentication System** ✅
 
-- NextAuth.js with Credentials provider
-- Login, Signup, Forgot Password, Reset Password
-- Role-based access (Teacher, Parent, Admin)
+- NextAuth.js with Google (staff) and magic link (parents)
+- Invite-only login — no signup, no passwords
+- Role-based access (Teacher, Parent, Admin, Super-admin)
 - Session management with JWT
-- Password hashing with bcrypt
 
 ### 2. **Testing Infrastructure** ✅
 
@@ -50,7 +49,6 @@ src/
 ├── app/                      # Next.js App Router
 │   ├── (auth)/              # Auth routes (grouped)
 │   │   ├── login/
-│   │   └── signup/
 │   ├── (teacher)/           # Teacher routes
 │   │   ├── dashboard/
 │   │   ├── forms/
@@ -154,7 +152,7 @@ npm run type-check       # TypeScript type checking
 
 ### Ready to Use:
 
-- ✅ Authentication (login, signup, password reset)
+- ✅ Invite-only sign-in (Google + parent magic link)
 - ✅ Teacher Dashboard with stats and form management
 - ✅ Form Builder with custom fields
 - ✅ Parent Dashboard with pending/signed forms
@@ -179,9 +177,8 @@ npm run dev
 # Open browser
 open http://localhost:6001
 
-# Login as teacher
-Email: teacher@test.com
-Password: password123
+# Sign in at /login with Google (staff) or a parent magic link.
+# There is no password.
 ```
 
 ## 💡 What's Next?

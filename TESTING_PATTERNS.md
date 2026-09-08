@@ -293,71 +293,13 @@ describe('sendFormToParents', () => {
 import { test, expect } from '@playwright/test';
 
 test.describe('Form Creation and Signing Flow', () => {
-  test('teacher creates form and parent signs it', async ({ page, context }) => {
-    // TEACHER FLOW
+  test('staff sign in is Google; parents sign from a token link', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('[name="email"]', 'teacher@school.com');
-    await page.fill('[name="password"]', 'password123');
-    await page.click('[type="submit"]');
+    await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible();
+    await expect(page.locator('input[name="password"]')).toHaveCount(0);
 
-    // Wait for dashboard
-    await expect(page).toHaveURL('/teacher/dashboard');
-
-    // Create new form
-    await page.click('button:has-text("Create Form")');
-    await page.fill('[name="title"]', 'Zoo Field Trip');
-    await page.fill('[name="description"]', 'Annual zoo visit for 3rd graders');
-    await page.fill('[name="eventDate"]', '2025-12-15');
-    await page.fill('[name="deadline"]', '2025-12-01');
-
-    // Select students
-    await page.click('text=Select Students');
-    await page.check('[data-student-id="student-1"]');
-    await page.check('[data-student-id="student-2"]');
-
-    // Submit form
-    await page.click('button:has-text("Send to Parents")');
-
-    // Verify success message
-    await expect(page.locator('text=Form sent successfully')).toBeVisible();
-
-    // Verify form appears in dashboard
-    await expect(page.locator('text=Zoo Field Trip')).toBeVisible();
-    await expect(page.locator('text=0/2 signed')).toBeVisible();
-
-    // PARENT FLOW (new browser context to simulate different user)
-    const parentPage = await context.newPage();
-
-    // In real scenario, parent would receive email with link
-    // For testing, we'll navigate directly
-    const formId = await page.getAttribute('[data-form-id]', 'data-form-id');
-    await parentPage.goto(`/sign/${formId}?token=test-token`);
-
-    // Parent reviews form
-    await expect(parentPage.locator('h1')).toHaveText('Zoo Field Trip');
-    await expect(parentPage.locator('text=Annual zoo visit')).toBeVisible();
-
-    // Fill out additional info
-    await parentPage.fill('[name="emergencyContact"]', '555-1234');
-    await parentPage.check('[name="medicationConsent"]');
-
-    // Sign (using signature canvas)
-    const canvas = parentPage.locator('canvas');
-    await canvas.click(); // Simulate drawing signature
-    await canvas.dispatchEvent('mousedown', { clientX: 10, clientY: 10 });
-    await canvas.dispatchEvent('mousemove', { clientX: 100, clientY: 50 });
-    await canvas.dispatchEvent('mouseup');
-
-    // Submit signature
-    await parentPage.click('button:has-text("Submit Signature")');
-
-    // Verify confirmation
-    await expect(parentPage.locator('text=Thank you')).toBeVisible();
-    await expect(parentPage.locator('text=signed successfully')).toBeVisible();
-
-    // VERIFY TEACHER DASHBOARD UPDATES
-    await page.reload();
-    await expect(page.locator('text=1/2 signed')).toBeVisible();
+    await page.goto('/s/' + 'a'.repeat(32));
+    await expect(page.getByText(/invalid or has expired/i)).toBeVisible();
   });
 
   test('prevents signing after deadline', async ({ page }) => {

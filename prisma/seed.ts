@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import { hash } from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -13,7 +12,6 @@ async function main() {
     create: {
       email: 'teacher@test.com',
       name: 'Ms. Johnson',
-      password: await hash('password123', 10),
       role: 'TEACHER',
     },
   });
@@ -26,7 +24,6 @@ async function main() {
     create: {
       email: 'parent1@test.com',
       name: 'John Smith',
-      password: await hash('password123', 10),
       role: 'PARENT',
     },
   });
@@ -39,7 +36,6 @@ async function main() {
     create: {
       email: 'parent2@test.com',
       name: 'Sarah Williams',
-      password: await hash('password123', 10),
       role: 'PARENT',
     },
   });
@@ -52,7 +48,6 @@ async function main() {
     create: {
       email: 'admin@test.com',
       name: 'Principal Adams',
-      password: await hash('password123', 10),
       role: 'ADMIN',
     },
   });
@@ -221,12 +216,12 @@ async function main() {
   console.log('✅ Created sample submission');
 
   console.log('\n🎉 Database seeded successfully!');
-  console.log('\n📝 Test Accounts Created:');
+  console.log('\n📝 Users created (no passwords — this app is invite-only):');
   console.log('━'.repeat(50));
-  console.log('Teacher: teacher@test.com / password123');
-  console.log('Parent 1: parent1@test.com / password123');
-  console.log('Parent 2: parent2@test.com / password123');
-  console.log('Admin: admin@test.com / password123');
+  console.log('Teacher: teacher@test.com  (Google, after invite)');
+  console.log('Parent 1: parent1@test.com (sign-link or parent magic link)');
+  console.log('Parent 2: parent2@test.com (sign-link or parent magic link)');
+  console.log('Admin: admin@test.com      (Google, after invite)');
   console.log('━'.repeat(50));
   console.log('\n👥 Students: Emma Smith, Liam Williams, Olivia Johnson');
   console.log('📋 Forms: 2 active, 1 draft');

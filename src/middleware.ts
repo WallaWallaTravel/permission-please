@@ -80,7 +80,7 @@ export async function middleware(request: NextRequest) {
   // Check if trying to access a protected route
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route));
 
-  // Check if trying to access an auth route (login/signup)
+  // Check if trying to access an auth route (login)
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
 
   // Redirect unauthenticated users from protected routes to login

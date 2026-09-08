@@ -531,28 +531,25 @@ npx prisma studio
 Create `prisma/seed.ts`:
 
 ```typescript
-import { Prisma Client, Role } from '@prisma/client';
-import { hash } from 'bcrypt';
+import { PrismaClient, Role } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Create test teacher
+  // Create test teacher (no password — staff use Google after invite)
   const teacher = await prisma.user.create({
     data: {
       email: 'teacher@test.com',
       name: 'Test Teacher',
-      password: await hash('password123', 10),
       role: Role.TEACHER,
     },
   });
 
-  // Create test parent
+  // Create test parent (signs via /s/[token] or magic link)
   const parent = await prisma.user.create({
     data: {
       email: 'parent@test.com',
       name: 'Test Parent',
-      password: await hash('password123', 10),
       role: Role.PARENT,
     },
   });
@@ -645,7 +642,7 @@ npx shadcn-ui@latest add calendar
 ```bash
 # Create directory structure
 mkdir -p src/{app,components,lib,hooks,types}
-mkdir -p src/app/\(auth\)/\{login,signup\}
+mkdir -p src/app/\(auth\)/login
 mkdir -p src/app/\(teacher\)/\{dashboard,forms,students\}
 mkdir -p src/app/\(parent\)/\{dashboard,sign\}
 mkdir -p src/app/api/\{auth,forms,signatures\}

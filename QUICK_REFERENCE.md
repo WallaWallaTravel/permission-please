@@ -58,7 +58,6 @@ src/
 ├── app/                         # Next.js App Router
 │   ├── (auth)/                  # Auth routes (grouped)
 │   │   ├── login/
-│   │   └── signup/
 │   ├── (teacher)/               # Teacher routes
 │   │   ├── dashboard/
 │   │   └── forms/
@@ -317,19 +316,10 @@ describe('FormCard', () => {
 ```typescript
 import { test, expect } from '@playwright/test';
 
-test('teacher can create form', async ({ page }) => {
+test('login is invite-only with no password', async ({ page }) => {
   await page.goto('/login');
-  await page.fill('[name="email"]', 'teacher@test.com');
-  await page.fill('[name="password"]', 'password123');
-  await page.click('[type="submit"]');
-
-  await expect(page).toHaveURL('/teacher/dashboard');
-
-  await page.click('button:has-text("Create Form")');
-  await page.fill('[name="title"]', 'Zoo Trip');
-  await page.click('button:has-text("Submit")');
-
-  await expect(page.locator('text=Zoo Trip')).toBeVisible();
+  await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible();
+  await expect(page.locator('input[name="password"]')).toHaveCount(0);
 });
 ```
 

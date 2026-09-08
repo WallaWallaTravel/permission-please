@@ -31,13 +31,7 @@ npm run dev
 
 Open **http://localhost:6001**
 
-### Test Accounts
-
-| Role    | Email            | Password    |
-| ------- | ---------------- | ----------- |
-| Teacher | teacher@test.com | password123 |
-| Parent  | parent1@test.com | password123 |
-| Admin   | admin@test.com   | password123 |
+Accounts are invite-only. Staff sign in with Google. Parents sign from the email link (`/s/[token]`) or a magic link. There is no password login and no public signup.
 
 ## Tech Stack
 
@@ -56,7 +50,7 @@ Open **http://localhost:6001**
 ```
 src/
 ├── app/                  # Next.js pages and API routes
-│   ├── (auth)/          # Login, signup, password reset
+│   ├── (auth)/          # Login (Google + parent magic link)
 │   ├── teacher/         # Teacher dashboard, form builder
 │   ├── parent/          # Parent dashboard, signing flow
 │   ├── admin/           # Admin panel
@@ -90,22 +84,22 @@ npm run format           # Format code
 
 ### Implemented
 
-- [x] Authentication (login, signup, password reset)
+- [x] Invite-only sign-in (Google for staff, magic link for parents)
+- [x] Tokenized parent sign links (no parent account required)
 - [x] Teacher dashboard with stats
 - [x] Form builder with custom fields
 - [x] Digital signature capture (touch + mouse)
-- [x] Parent dashboard
 - [x] Form distribution via email
-- [x] Multi-student support
+- [x] Trip-morning roster
+- [x] School setup with annual license
 - [x] Audit logging
 - [x] Role-based access control
 
 ### Planned
 
-- [ ] Form templates
-- [ ] Automated reminders
-- [ ] PDF export
-- [ ] Analytics dashboard
+- [ ] Pay on sign (Stripe)
+- [ ] SIS import
+- [ ] SMS reminders
 
 ## Documentation
 
