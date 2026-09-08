@@ -5,6 +5,9 @@ import { prisma } from '@/lib/db';
 import { sendPermissionRequest } from '@/lib/email/resend';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { assertCanManageForm, authzResponse } from '@/lib/auth/school-access';
+import { upsertSignLink, signLinkUrl } from '@/lib/tokens/sign-link';
+import { assertSchoolCanSend } from '@/lib/auth/license';
 
 // POST - Distribute form to parents
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,11 +25,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Parse optional groupIds from request body
     let groupIds: string[] | undefined;
+    let entireSchool = false;
     try {
       const body = await request.json();
       groupIds = body.groupIds;
+      entireSchool = body.entireSchool === true;
     } catch {
-      // No body or invalid JSON - that's fine, send to all
+      // No body
+    }
+
+    if ((!groupIds || groupIds.length === 0) && !entireSchool) {
+      return NextResponse.json(
+        {
+          error: 'Choose at least one group, or confirm sending to the entire school.',
+          code: 'GROUP_REQUIRED',
+        },
+        { status: 400 }
+      );
     }
 
     // Verify form exists and belongs to teacher, include school for filtering
@@ -34,7 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       where: { id },
       include: {
         teacher: { select: { name: true, schoolId: true } },
-        school: { select: { name: true } },
+        school: { select: { name: true, isActive: true, licensedThrough: true } },
       },
     });
 
@@ -42,8 +57,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    if (form.teacherId !== session.user.id && session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    try {
+      await assertCanManageForm(
+        { id: session.user.id, role: session.user.role || '', schoolId: session.user.schoolId },
+        form
+      );
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
+    }
+
+    try {
+      assertSchoolCanSend(form.school);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     // Block distribution if form requires review but hasn't been approved
@@ -77,8 +107,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         });
       }
 
-      // Get students filtered by school (if form has school context)
-      const schoolFilter = form.schoolId ? { schoolId: form.schoolId } : {};
+      // Get students filtered by school (required — never the whole platform)
+      const schoolFilter = form.schoolId ? { schoolId: form.schoolId } : { id: '__none__' };
 
       // If groupIds provided, filter to only students in those groups
       let groupMemberFilter = {};
@@ -176,38 +206,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return { submissionData, createdSubmissions };
     });
 
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:6001';
-    const signUrl = `${baseUrl}/parent/sign/${id}`;
+    const parentEmails = new Map<
+      string,
+      {
+        email: string;
+        name: string;
+        parentId: string;
+        studentNames: string[];
+      }
+    >();
+
+    for (const data of result.submissionData) {
+      const existing = parentEmails.get(data.parentEmail);
+      if (existing) {
+        existing.studentNames.push(data.studentName);
+      } else {
+        parentEmails.set(data.parentEmail, {
+          email: data.parentEmail,
+          name: data.parentName,
+          parentId: data.parentId,
+          studentNames: [data.studentName],
+        });
+      }
+    }
 
     const emailsSent: string[] = [];
     const errors: string[] = [];
 
     // Only send emails if Resend is configured
     if (process.env.RESEND_API_KEY) {
-      // Group by parent email, collecting student names
-      const parentEmails = new Map<
-        string,
-        {
-          email: string;
-          name: string;
-          studentNames: string[];
-        }
-      >();
-
-      for (const data of result.submissionData) {
-        const existing = parentEmails.get(data.parentEmail);
-        if (existing) {
-          existing.studentNames.push(data.studentName);
-        } else {
-          parentEmails.set(data.parentEmail, {
-            email: data.parentEmail,
-            name: data.parentName,
-            studentNames: [data.studentName],
-          });
-        }
-      }
-
-      // Send emails (in parallel batches of 5 to avoid rate limits)
       const parentEntries = Array.from(parentEmails.values());
       const batchSize = 5;
       const schoolName = form.school?.name || 'School';
@@ -217,6 +244,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         await Promise.allSettled(
           batch.map(async (parent) => {
             try {
+              const token = await upsertSignLink(id, parent.parentId, form.deadline);
               await sendPermissionRequest({
                 parentEmail: parent.email,
                 parentName: parent.name,
@@ -224,7 +252,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 formTitle: form.title,
                 eventDate: form.eventDate,
                 deadline: form.deadline,
-                signUrl,
+                signUrl: signLinkUrl(token),
                 teacherName: form.teacher.name,
                 schoolName,
                 description: form.description,
@@ -238,12 +266,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         );
       }
     } else {
-      // Mark all as sent but note email not configured
-      result.submissionData.forEach((d) => {
-        if (!emailsSent.includes(d.parentEmail)) {
-          emailsSent.push(`${d.parentEmail} (email service not configured)`);
-        }
-      });
+      for (const parent of parentEmails.values()) {
+        await upsertSignLink(id, parent.parentId, form.deadline);
+        emailsSent.push(`${parent.email} (email service not configured)`);
+      }
     }
 
     return NextResponse.json({

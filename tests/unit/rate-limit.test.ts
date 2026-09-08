@@ -150,4 +150,15 @@ describe('rateLimitPresets', () => {
     expect(rateLimitPresets.health).toBeDefined();
     expect(rateLimitPresets.health.max).toBeGreaterThan(100);
   });
+
+  it('has signLink preset stricter than general API', () => {
+    expect(rateLimitPresets.signLink).toBeDefined();
+    expect(rateLimitPresets.signLink.max).toBeLessThan(rateLimitPresets.api.max);
+  });
+
+  it('has privacyRequest preset with a tight hourly cap', () => {
+    expect(rateLimitPresets.privacyRequest).toBeDefined();
+    expect(rateLimitPresets.privacyRequest.max).toBeLessThanOrEqual(5);
+    expect(rateLimitPresets.privacyRequest.windowMs).toBeGreaterThanOrEqual(60 * 60 * 1000);
+  });
 });

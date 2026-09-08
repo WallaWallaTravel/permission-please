@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { z } from 'zod';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { ParentIdentityError, resolveOrCreateParent } from '@/lib/auth/parent-identity';
 
 const addStudentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -71,6 +72,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    if (!session.user.schoolId) {
+      return NextResponse.json({ error: 'User must be assigned to a school' }, { status: 403 });
+    }
+
     const body = await request.json();
     const validatedData = addStudentSchema.parse(body);
 
@@ -82,22 +87,11 @@ export async function POST(request: NextRequest) {
 
     // Use transaction to create student and parent atomically
     const result = await prisma.$transaction(async (tx) => {
-      // Check if parent already exists by email
-      let parent = await tx.user.findUnique({
-        where: { email: validatedData.parentEmail.toLowerCase() },
+      const { parent } = await resolveOrCreateParent(tx as never, {
+        email: validatedData.parentEmail,
+        name: validatedData.parentName,
+        schoolId: teacher?.schoolId ?? session.user.schoolId ?? null,
       });
-
-      // Create parent if doesn't exist
-      if (!parent) {
-        parent = await tx.user.create({
-          data: {
-            email: validatedData.parentEmail.toLowerCase(),
-            name: validatedData.parentName,
-            role: 'PARENT',
-            schoolId: teacher?.schoolId,
-          },
-        });
-      }
 
       // Create student
       const student = await tx.student.create({
@@ -138,6 +132,10 @@ export async function POST(request: NextRequest) {
       parent: { id: result.parent.id, name: result.parent.name, email: result.parent.email },
     });
   } catch (error) {
+    if (error instanceof ParentIdentityError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Validation error', details: error.issues },

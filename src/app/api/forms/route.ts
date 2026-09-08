@@ -95,6 +95,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    if (!user.schoolId) {
+      return NextResponse.json({ error: 'User must be assigned to a school' }, { status: 403 });
+    }
+
     let body;
     try {
       body = await request.json();
@@ -114,7 +118,7 @@ export async function POST(request: Request) {
     const form = await prisma.permissionForm.create({
       data: {
         teacherId: user.id,
-        schoolId: user.schoolId || undefined,
+        schoolId: user.schoolId,
         title: validatedData.title,
         description: validatedData.description,
         eventDate: new Date(validatedData.eventDate),

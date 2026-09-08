@@ -680,3 +680,67 @@ Permission Please
 
   return data;
 }
+
+const PRIVACY_INBOX = process.env.PRIVACY_EMAIL || 'privacy@permissionplease.app';
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+export interface DeletionRequestNotice {
+  requesterEmail: string;
+  requesterName?: string;
+  schoolName?: string;
+  subjectType: string;
+  details: string;
+}
+
+export async function sendDeletionRequestNotice(params: DeletionRequestNotice) {
+  if (!process.env.RESEND_API_KEY) {
+    logger.warn('Deletion request email skipped: RESEND_API_KEY not configured');
+    return { emailed: false };
+  }
+
+  const { requesterEmail, requesterName, schoolName, subjectType, details } = params;
+  const name = requesterName?.trim() || 'Not provided';
+  const school = schoolName?.trim() || 'Not provided';
+
+  const text = `
+Data deletion request
+
+From: ${name} <${requesterEmail}>
+School: ${school}
+Subject: ${subjectType}
+
+${details}
+
+This is a request only. Do not delete records from this email alone.
+  `.trim();
+
+  const { data, error } = await getResendClient().emails.send({
+    from: FROM_EMAIL,
+    to: PRIVACY_INBOX,
+    replyTo: requesterEmail,
+    subject: `Data deletion request from ${requesterEmail}`,
+    html: `
+      <p><strong>Data deletion request</strong></p>
+      <p>From: ${escapeHtml(name)} &lt;${escapeHtml(requesterEmail)}&gt;</p>
+      <p>School: ${escapeHtml(school)}</p>
+      <p>Subject: ${escapeHtml(subjectType)}</p>
+      <pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(details)}</pre>
+      <p>This is a request only. Do not delete records from this email alone.</p>
+    `,
+    text,
+  });
+
+  if (error) {
+    logger.error('Failed to send deletion request notice', error);
+    throw new Error(`Failed to send deletion request notice: ${error.message}`);
+  }
+
+  return { emailed: true, data };
+}

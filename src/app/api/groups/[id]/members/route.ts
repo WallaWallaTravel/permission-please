@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { assertSameSchool, authzResponse } from '@/lib/auth/school-access';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -42,8 +43,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
 
-    if (group.schoolId !== user.schoolId && user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      assertSameSchool(user, group.schoolId);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     const body = await request.json();
@@ -145,8 +150,12 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
 
-    if (group.schoolId !== user.schoolId && user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      assertSameSchool(user, group.schoolId);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     const body = await request.json();

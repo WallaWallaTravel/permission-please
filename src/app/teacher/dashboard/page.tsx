@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { SignOutButton } from '@/components/shared/SignOutButton';
 import { DistributeButton } from '@/components/forms/DistributeButton';
 import { MobileNav } from '@/components/shared/MobileNav';
+import { schoolCanSend } from '@/lib/auth/license';
 
 interface PageProps {
   searchParams: Promise<{ preview_school?: string }>;
@@ -81,6 +82,15 @@ export default async function TeacherDashboardPage({ searchParams }: PageProps) 
     },
   });
 
+  const licenseSchoolId = isPreviewMode ? preview_school : user.schoolId;
+  const homeSchool = licenseSchoolId
+    ? await prisma.school.findUnique({
+        where: { id: licenseSchoolId },
+        select: { isActive: true, licensedThrough: true },
+      })
+    : null;
+  const sendCheck = schoolCanSend(homeSchool);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
       {/* Preview Banner */}
@@ -92,6 +102,12 @@ export default async function TeacherDashboardPage({ searchParams }: PageProps) 
           <Link href={`/admin/schools/${preview_school}`} className="underline hover:no-underline">
             Exit Preview
           </Link>
+        </div>
+      )}
+
+      {!sendCheck.ok && (
+        <div className="bg-amber-600 px-4 py-2 text-center text-sm text-white">
+          {sendCheck.message}
         </div>
       )}
 
@@ -410,6 +426,15 @@ export default async function TeacherDashboardPage({ searchParams }: PageProps) 
                         {form.status === 'DRAFT' || form.status === 'ACTIVE' ? (
                           <DistributeButton formId={form.id} />
                         ) : null}
+
+                        {totalCount > 0 && (
+                          <Link
+                            href={`/teacher/forms/${form.id}/roster`}
+                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            Roster
+                          </Link>
+                        )}
 
                         <Link
                           href={`/teacher/forms/${form.id}`}

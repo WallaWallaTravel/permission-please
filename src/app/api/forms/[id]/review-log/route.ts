@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { assertCanManageForm, authzResponse } from '@/lib/auth/school-access';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -21,21 +22,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only reviewers, admins, and the form owner can view the review log
-    if (user.role !== 'REVIEWER' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-      // Check if user is the form owner
-      const form = await prisma.permissionForm.findUnique({
-        where: { id },
-        select: { teacherId: true },
-      });
+    const form = await prisma.permissionForm.findUnique({
+      where: { id },
+      select: { id: true, teacherId: true, schoolId: true },
+    });
 
-      if (!form) {
-        return NextResponse.json({ error: 'Form not found' }, { status: 404 });
-      }
+    if (!form) {
+      return NextResponse.json({ error: 'Form not found' }, { status: 404 });
+    }
 
-      if (form.teacherId !== user.id) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
+    try {
+      await assertCanManageForm(user, form);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     const logs = await prisma.formReviewLog.findMany({
@@ -56,6 +57,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ logs });
   } catch (error) {
+    const authz = authzResponse(error);
+    if (authz) return authz;
     logger.error('Error fetching review log', error as Error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

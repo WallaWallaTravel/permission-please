@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { sendFormApprovedEmail } from '@/lib/email/resend';
+import { assertCanManageForm, authzResponse } from '@/lib/auth/school-access';
 
 // POST - Approve form (reviewer only)
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -43,12 +44,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    // Reviewer must be at the same school
-    if (form.schoolId !== session.user.schoolId) {
-      return NextResponse.json(
-        { error: 'You can only review forms from your school' },
-        { status: 403 }
-      );
+    try {
+      await assertCanManageForm(session.user, form);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     // Form must be pending review

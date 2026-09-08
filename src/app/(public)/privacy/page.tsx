@@ -30,7 +30,7 @@ export default function PrivacyPolicyPage() {
       <main className="mx-auto max-w-4xl px-4 py-12">
         <div className="rounded-xl border border-slate-200 bg-white p-8 md:p-12">
           <h1 className="mb-2 text-3xl font-bold text-slate-900">Privacy Policy</h1>
-          <p className="mb-8 text-slate-500">Last updated: December 2024</p>
+          <p className="mb-8 text-slate-500">Last updated: September 2026</p>
 
           <div className="prose prose-slate max-w-none">
             <section className="mb-8">
@@ -125,10 +125,9 @@ export default function PrivacyPolicyPage() {
               </p>
               <ul className="list-inside list-disc space-y-1 text-slate-600">
                 <li>Encryption of data in transit (HTTPS/TLS)</li>
-                <li>Secure password hashing (bcrypt)</li>
+                <li>Invite-only sign-in (Google or a short-lived email link — no passwords)</li>
                 <li>Role-based access controls</li>
-                <li>Regular security audits</li>
-                <li>IP address masking in logs</li>
+                <li>IP addresses stored in masked form on signatures and audit logs</li>
                 <li>Rate limiting to prevent abuse</li>
               </ul>
             </section>
@@ -141,8 +140,8 @@ export default function PrivacyPolicyPage() {
                 guidelines. Schools can request deletion of their data at any time.
               </p>
               <p className="text-slate-600">
-                Audit logs are retained for compliance purposes and are automatically anonymized
-                after the retention period.
+                Audit logs are retained until the school asks us to delete them. We do not currently
+                run an automatic anonymization job.
               </p>
             </section>
 
@@ -151,35 +150,54 @@ export default function PrivacyPolicyPage() {
               <p className="mb-4 text-slate-600">We use the following third-party services:</p>
               <ul className="list-inside list-disc space-y-1 text-slate-600">
                 <li>
-                  <strong>Email Delivery:</strong> Resend (for sending permission requests and
-                  notifications)
+                  <strong>Email:</strong> Resend
                 </li>
                 <li>
-                  <strong>Hosting:</strong> Cloud infrastructure providers with SOC 2 compliance
+                  <strong>Hosting:</strong> Vercel
                 </li>
                 <li>
-                  <strong>Database:</strong> PostgreSQL with encryption at rest
+                  <strong>Database and file storage:</strong> Supabase (PostgreSQL)
+                </li>
+                <li>
+                  <strong>Sign-in:</strong> Google OAuth when a school uses Google accounts
+                </li>
+                <li>
+                  <strong>Error monitoring:</strong> Sentry, when configured
                 </li>
               </ul>
               <p className="mt-4 text-slate-600">
-                All third-party providers are bound by data processing agreements that protect your
-                information.
+                We will sign a{' '}
+                <Link href="/dpa" className="font-medium text-blue-600 hover:text-blue-700">
+                  data processing agreement
+                </Link>{' '}
+                with a school that asks for one. A template is published at /dpa. We do not claim
+                that every subprocessor relationship is already under a DPA.
               </p>
             </section>
 
             <section className="mb-8">
-              <h2 className="mb-4 text-xl font-semibold text-slate-900">8. COPPA Compliance</h2>
+              <h2 className="mb-4 text-xl font-semibold text-slate-900">
+                8. Children&apos;s privacy
+              </h2>
               <p className="mb-4 text-slate-600">
-                Permission Please is designed for use by schools and requires parental consent for
-                any collection of information related to children under 13. We:
+                Schools import student names and grades so teachers can send permission slips.
+                Parents then review and sign. This tool is built for schools acting as the data
+                controller. We are not claiming COPPA &quot;verifiable parental consent&quot; for
+                the platform itself, and we do not market to children.
               </p>
               <ul className="list-inside list-disc space-y-1 text-slate-600">
-                <li>Collect only information necessary for the service</li>
-                <li>Obtain verifiable parental consent through the electronic signature process</li>
+                <li>We collect only what a school needs to run permission slips</li>
                 <li>
-                  Allow parents to review and request deletion of their child&apos;s information
+                  Parents can email privacy@permissionplease.app or use the{' '}
+                  <Link
+                    href="/privacy/delete"
+                    className="font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    deletion request form
+                  </Link>{' '}
+                  to review or request deletion
                 </li>
-                <li>Do not condition participation on providing more information than necessary</li>
+                <li>We do not sell student or parent data</li>
               </ul>
             </section>
 
@@ -189,7 +207,15 @@ export default function PrivacyPolicyPage() {
               <ul className="list-inside list-disc space-y-1 text-slate-600">
                 <li>Access the personal information we hold about you</li>
                 <li>Request correction of inaccurate information</li>
-                <li>Request deletion of your data (subject to legal retention requirements)</li>
+                <li>
+                  Request deletion of your data (subject to legal retention requirements) via the{' '}
+                  <Link
+                    href="/privacy/delete"
+                    className="font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    deletion request form
+                  </Link>
+                </li>
                 <li>Receive a copy of your data in a portable format</li>
                 <li>Withdraw consent for optional data processing</li>
               </ul>
@@ -218,14 +244,24 @@ export default function PrivacyPolicyPage() {
                   <br />
                   Email: privacy@permissionplease.app
                   <br />
-                  For data deletion requests: privacy@permissionplease.app
+                  For data deletion requests:{' '}
+                  <Link
+                    href="/privacy/delete"
+                    className="font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    /privacy/delete
+                  </Link>{' '}
+                  or privacy@permissionplease.app
                 </p>
               </div>
             </section>
           </div>
         </div>
 
-        <div className="mt-8 text-center">
+        <div className="mt-8 flex justify-center gap-6 text-center">
+          <Link href="/dpa" className="font-medium text-blue-600 hover:text-blue-700">
+            Data Processing Agreement →
+          </Link>
           <Link href="/terms" className="font-medium text-blue-600 hover:text-blue-700">
             View Terms of Service →
           </Link>

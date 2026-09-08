@@ -50,43 +50,27 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form is not active' }, { status: 400 });
     }
 
-    // Get all of the parent's students
-    const parentStudents = await prisma.parentStudent.findMany({
-      where: { parentId },
-      include: { student: true },
-    });
-
-    if (parentStudents.length === 0) {
-      return NextResponse.json({ error: 'No students linked to your account' }, { status: 400 });
-    }
-
-    // Get existing submissions to check which students have already signed
     const existingSubmissions = await prisma.formSubmission.findMany({
       where: {
         formId: id,
         parentId,
-        studentId: { in: parentStudents.map((ps) => ps.student.id) },
       },
-      select: {
-        studentId: true,
-        status: true,
+      include: {
+        student: { select: { id: true, name: true, grade: true } },
       },
     });
 
-    // Build a map of student ID to signed status
-    const signedMap = new Map(
-      existingSubmissions.map((sub) => [sub.studentId, sub.status === 'SIGNED'])
-    );
+    if (existingSubmissions.length === 0) {
+      return NextResponse.json({ error: 'This form was not sent to you' }, { status: 403 });
+    }
 
-    // Build students array with signed status
-    const students = parentStudents.map((ps) => ({
-      id: ps.student.id,
-      name: ps.student.name,
-      grade: ps.student.grade,
-      hasSigned: signedMap.get(ps.student.id) || false,
+    const students = existingSubmissions.map((sub) => ({
+      id: sub.student.id,
+      name: sub.student.name,
+      grade: sub.student.grade,
+      hasSigned: sub.status === 'SIGNED',
     }));
 
-    // Check if ALL students have already signed
     const allSigned = students.every((s) => s.hasSigned);
     if (allSigned) {
       return NextResponse.json(
@@ -95,7 +79,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Audit log form view
     const { ipAddress, userAgent } = getRequestContext(request);
     auditLog({
       action: 'FORM_VIEW',
@@ -117,6 +100,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       deadline: form.deadline,
       teacher: form.teacher,
       fields: form.fields,
+      documents: form.documents,
       students,
     });
   } catch (error) {
@@ -176,7 +160,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form deadline has passed' }, { status: 400 });
     }
 
-    // Verify student belongs to parent
+    // Verify student belongs to parent AND a PENDING/existing submission was distributed
     const parentStudent = await prisma.parentStudent.findUnique({
       where: {
         parentId_studentId: {
@@ -189,6 +173,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!parentStudent) {
       return NextResponse.json({ error: 'Student not linked to your account' }, { status: 400 });
+    }
+
+    const distributed = await prisma.formSubmission.findUnique({
+      where: {
+        formId_parentId_studentId: {
+          formId: id,
+          parentId,
+          studentId,
+        },
+      },
+    });
+
+    if (!distributed) {
+      return NextResponse.json(
+        { error: 'This form was not sent for that student' },
+        { status: 403 }
+      );
     }
 
     // Get request context for audit
@@ -207,29 +208,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
         },
       });
 
-      if (existingSubmission?.status === 'SIGNED') {
-        return { alreadySigned: true, studentName: parentStudent.student.name };
+      if (!existingSubmission) {
+        return { alreadySigned: false as const, missing: true as const };
       }
 
-      // Create or update submission atomically
-      const submission = await tx.formSubmission.upsert({
-        where: {
-          formId_parentId_studentId: {
-            formId: id,
-            parentId,
-            studentId,
-          },
-        },
-        create: {
-          formId: id,
-          parentId,
-          studentId,
-          signatureData,
-          status: 'SIGNED',
-          signedAt: new Date(),
-          ipAddress,
-        },
-        update: {
+      if (existingSubmission.status === 'SIGNED') {
+        return { alreadySigned: true as const, studentName: parentStudent.student.name };
+      }
+
+      const submission = await tx.formSubmission.update({
+        where: { id: existingSubmission.id },
+        data: {
           signatureData,
           status: 'SIGNED',
           signedAt: new Date(),
@@ -262,6 +251,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json(
         { error: `You have already signed this form for ${result.studentName}` },
         { status: 400 }
+      );
+    }
+
+    if ('missing' in result && result.missing) {
+      return NextResponse.json(
+        { error: 'This form was not sent for that student' },
+        { status: 403 }
       );
     }
 
@@ -319,4 +315,3 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Failed to submit signature' }, { status: 500 });
   }
 }
-

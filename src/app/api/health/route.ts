@@ -24,8 +24,7 @@ interface HealthStatus {
     database: {
       status: 'up' | 'down';
       latencyMs?: number;
-      projectId?: string; // Supabase project ID for verification
-      userCount?: number; // Verify schema exists
+      projectId?: string;
       error?: string;
     };
     memory: {
@@ -59,14 +58,13 @@ export async function GET(): Promise<NextResponse<HealthStatus>> {
   try {
     const dbStart = Date.now();
     // Query actual table to verify schema exists (not just connection)
-    const userCount = await prisma.user.count();
+    await prisma.$queryRaw`SELECT 1`;
     const dbLatency = Date.now() - dbStart;
 
     dbStatus = {
       status: 'up',
       latencyMs: dbLatency,
       projectId: actualProjectId || 'unknown',
-      userCount,
     };
 
     // Warn if connected to wrong project

@@ -55,6 +55,7 @@ export const mockPrismaClient = {
   },
   invite: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -77,6 +78,11 @@ export const mockPrismaClient = {
     findMany: vi.fn(),
     create: vi.fn(),
     delete: vi.fn(),
+  },
+  formSignLink: {
+    findUnique: vi.fn(),
+    upsert: vi.fn(),
+    update: vi.fn(),
   },
   passwordResetToken: {
     findUnique: vi.fn(),
@@ -155,6 +161,7 @@ export const mockDataFactory = {
     deadline: new Date('2024-06-10'),
     status: 'ACTIVE',
     teacherId: 'teacher-123',
+    schoolId: 'school-123',
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -202,6 +209,8 @@ export const mockDataFactory = {
     state: 'TS',
     zipCode: '12345',
     phone: '555-123-4567',
+    isActive: true,
+    licensedThrough: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

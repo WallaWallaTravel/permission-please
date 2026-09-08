@@ -17,26 +17,16 @@ test.describe('Public Pages Accessibility', () => {
     expect(await links.count()).toBeGreaterThan(0);
   });
 
-  test('login page has accessible form', async ({ page }) => {
+  test('login page has accessible sign-in options', async ({ page }) => {
     await page.goto('/login');
 
-    // Form fields should have accessible labels
-    await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
-
-    // Submit button should be accessible
-    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /magic link/i })).toBeVisible();
   });
 
-  test('signup page has accessible form', async ({ page }) => {
-    await page.goto('/signup');
-
-    // Form should be present
-    await expect(page.getByRole('form').or(page.locator('form'))).toBeVisible();
-
-    // Role selection should be accessible
-    await expect(page.getByText(/teacher/i)).toBeVisible();
-    await expect(page.getByText(/parent/i)).toBeVisible();
+  test('signup page is not offered', async ({ page }) => {
+    const response = await page.goto('/signup');
+    expect(response?.status()).toBeGreaterThanOrEqual(400);
   });
 });
 
@@ -48,18 +38,20 @@ test.describe('Error States', () => {
     await expect(page.getByText(/not found|404|error/i)).toBeVisible({ timeout: 5000 });
   });
 
-  test('handles invalid login gracefully', async ({ page }) => {
+  test('magic link form is usable without a password field', async ({ page }) => {
     await page.goto('/login');
 
+    await page.getByRole('button', { name: /^magic link$/i }).click();
     await page.fill('input[name="email"]', 'invalid@email.com');
-    await page.fill('input[name="password"]', 'wrongpassword');
     await page.click('button[type="submit"]');
 
-    // Should show error message
-    await expect(page.getByText(/invalid|error|incorrect/i)).toBeVisible({ timeout: 5000 });
-
-    // Page should still be functional
-    await expect(page.getByRole('button', { name: /sign in/i })).toBeEnabled();
+    await expect(
+      page.getByText(/check your email|failed to send|something went wrong/i)
+    ).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByRole('button', { name: /send magic link/i })).toBeEnabled();
+    await expect(page.locator('input[name="password"]')).toHaveCount(0);
   });
 });
 
@@ -82,22 +74,17 @@ test.describe('Health Check', () => {
 });
 
 test.describe('Rate Limiting Behavior', () => {
-  test('allows normal authentication attempts', async ({ page }) => {
+  test('allows normal magic-link attempts', async ({ page }) => {
     await page.goto('/login');
+    await page.getByRole('button', { name: /^magic link$/i }).click();
 
-    // Multiple normal attempts should work
     for (let i = 0; i < 3; i++) {
       await page.fill('input[name="email"]', `test${i}@example.com`);
-      await page.fill('input[name="password"]', 'wrongpassword');
       await page.click('button[type="submit"]');
 
-      // Should get normal error, not rate limit
-      const errorText = page.getByText(/invalid|error|incorrect/i);
-      await expect(errorText).toBeVisible({ timeout: 5000 });
-
-      // Clear for next attempt
-      await page.fill('input[name="email"]', '');
-      await page.fill('input[name="password"]', '');
+      await expect(
+        page.getByText(/check your email|failed to send|something went wrong|too many/i)
+      ).toBeVisible({ timeout: 10000 });
     }
   });
 });
@@ -106,23 +93,15 @@ test.describe('Keyboard Navigation', () => {
   test('can navigate login form with keyboard', async ({ page }) => {
     await page.goto('/login');
 
-    // Tab to email field
-    await page.keyboard.press('Tab');
-    await page.keyboard.press('Tab'); // Skip nav links
-
-    // Type email
+    await page.getByRole('button', { name: /^magic link$/i }).click();
+    await page.locator('#magic-email').focus();
     await page.keyboard.type('test@example.com');
-
-    // Tab to password
-    await page.keyboard.press('Tab');
-    await page.keyboard.type('password123');
-
-    // Tab to submit button and press Enter
     await page.keyboard.press('Tab');
     await page.keyboard.press('Enter');
 
-    // Form should have been submitted
-    await expect(page.getByText(/invalid|error|dashboard/i)).toBeVisible({ timeout: 5000 });
+    await expect(
+      page.getByText(/check your email|failed to send|something went wrong/i)
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('can navigate with tab through main page', async ({ page }) => {

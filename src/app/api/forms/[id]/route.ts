@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { updateFormSchema } from '@/lib/validations/form-schema';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { assertCanEditForm, assertCanManageForm, authzResponse } from '@/lib/auth/school-access';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -73,20 +74,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    // Check permissions - allow owner or users with shared access
-    if (user.role === 'TEACHER' && form.teacherId !== user.id) {
-      // Check if form is shared with this user
-      const share = await prisma.formShare.findUnique({
-        where: {
-          formId_userId: {
-            formId: id,
-            userId: user.id,
-          },
-        },
-      });
-      if (!share) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
+    try {
+      await assertCanManageForm(user, form);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     return NextResponse.json({ form });
@@ -122,19 +115,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    // Check ownership or edit permission via share
-    if (existingForm.teacherId !== user.id && user.role !== 'ADMIN') {
-      const share = await prisma.formShare.findUnique({
-        where: {
-          formId_userId: {
-            formId: id,
-            userId: user.id,
-          },
-        },
-      });
-      if (!share || !share.canEdit) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
+    try {
+      await assertCanEditForm(user, existingForm);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     const body = await request.json();
@@ -363,8 +349,12 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    if (existingForm.teacherId !== user.id && user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      await assertCanEditForm(user, existingForm);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     await prisma.permissionForm.delete({

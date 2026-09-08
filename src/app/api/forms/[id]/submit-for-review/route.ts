@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { sendReviewSubmittedEmail } from '@/lib/email/resend';
+import { assertCanEditForm, authzResponse } from '@/lib/auth/school-access';
 
 // POST - Submit form for review
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -31,6 +32,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!form) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
+    }
+
+    try {
+      await assertCanEditForm(session.user, form);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     // Only form owner can submit for review

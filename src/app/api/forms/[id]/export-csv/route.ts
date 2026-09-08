@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { assertCanManageForm, authzResponse } from '@/lib/auth/school-access';
+import { buildTripRoster, filterRoster, parseRosterFilter, rosterToCsv } from '@/lib/roster';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -35,10 +37,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
         submissions: {
           include: {
             parent: {
-              select: { name: true, email: true },
+              select: { id: true, name: true, email: true },
             },
             student: {
-              select: { name: true, grade: true },
+              select: { id: true, name: true, grade: true },
             },
             responses: {
               include: {
@@ -56,19 +58,35 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    // Check ownership or admin access
-    if (form.teacherId !== user.id && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-      const share = await prisma.formShare.findUnique({
-        where: {
-          formId_userId: {
-            formId: id,
-            userId: user.id,
-          },
+    try {
+      await assertCanManageForm(user, form);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
+    }
+
+    const view = request.nextUrl.searchParams.get('view');
+    const safeTitle =
+      form.title
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .replace(/\s+/g, '-')
+        .substring(0, 40) || 'form';
+
+    if (view === 'roster') {
+      const filter = parseRosterFilter(request.nextUrl.searchParams.get('status'));
+      const rows = filterRoster(buildTripRoster(form.submissions), filter);
+      const csv = rosterToCsv(rows);
+      const filename =
+        filter === 'cleared' ? `${safeTitle}-bus-list.csv` : `${safeTitle}-trip-roster.csv`;
+
+      return new NextResponse(csv, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
         },
       });
-      if (!share) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
     }
 
     // Build CSV
@@ -126,13 +144,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
 
     const csv = csvRows.join('\n');
-
-    // Sanitize filename
-    const safeTitle =
-      form.title
-        .replace(/[^a-zA-Z0-9\s]/g, '')
-        .replace(/\s+/g, '-')
-        .substring(0, 40) || 'form';
 
     const filename = `${safeTitle}-submissions.csv`;
 

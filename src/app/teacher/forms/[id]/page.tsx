@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { DistributeButton } from '@/components/forms/DistributeButton';
 import { ShareFormButton } from '@/components/forms/ShareFormButton';
+import { buildTripRoster, rosterCounts } from '@/lib/roster';
 
 interface FormData {
   form: {
@@ -80,6 +81,7 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
   const [showDeadlineExtend, setShowDeadlineExtend] = useState(false);
   const [newDeadline, setNewDeadline] = useState('');
   const [extendingDeadline, setExtendingDeadline] = useState(false);
+  const [remindingId, setRemindingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadForm() {
@@ -209,6 +211,26 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const handleRemind = async (submissionId: string) => {
+    setRemindingId(submissionId);
+    setError('');
+    try {
+      const res = await fetch(`/api/forms/${id}/remind`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submissionId }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error || 'Failed to send reminder');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send reminder');
+    } finally {
+      setRemindingId(null);
+    }
+  };
+
   const handleExportCsv = async () => {
     setExportingCsv(true);
     try {
@@ -294,6 +316,7 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
   const signedCount = form.submissions.filter((s) => s.status === 'SIGNED').length;
   const pendingCount = form.submissions.filter((s) => s.status === 'PENDING').length;
   const totalSubmissions = form.submissions.length;
+  const tripCounts = rosterCounts(buildTripRoster(form.submissions));
 
   const statusColors = {
     DRAFT: 'bg-gray-100 text-gray-800',
@@ -492,6 +515,28 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
               </div>
             </div>
+
+            {form.submissions.length > 0 && (
+              <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold text-gray-900">Trip roster</p>
+                  <p className="text-sm text-gray-600">
+                    {tripCounts.cleared} cleared to go
+                    {tripCounts.missing > 0
+                      ? ` · ${tripCounts.missing} still need a signature`
+                      : ''}
+                    {tripCounts.declined > 0 ? ` · ${tripCounts.declined} declined` : ''}
+                  </p>
+                </div>
+                <Link
+                  href={`/teacher/forms/${form.id}/roster`}
+                  className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
+                  style={{ minHeight: '44px' }}
+                >
+                  Open roster
+                </Link>
+              </div>
+            )}
 
             {/* Dates */}
             <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -778,22 +823,30 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h3 className="font-semibold text-gray-900">Signature Status</h3>
             {form.submissions.length > 0 && (
-              <button
-                onClick={handleExportCsv}
-                disabled={exportingCsv}
-                className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-                title="Export submissions to CSV"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                {exportingCsv ? 'Exporting...' : 'Export CSV'}
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/teacher/forms/${form.id}/roster`}
+                  className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100"
+                >
+                  Trip roster
+                </Link>
+                <button
+                  onClick={handleExportCsv}
+                  disabled={exportingCsv}
+                  className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                  title="Export submissions to CSV"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  {exportingCsv ? 'Exporting...' : 'Export CSV'}
+                </button>
+              </div>
             )}
           </div>
 
@@ -899,6 +952,15 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                             </svg>
                             PDF
                           </a>
+                        ) : submission.status === 'PENDING' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemind(submission.id)}
+                            disabled={remindingId === submission.id}
+                            className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+                          >
+                            {remindingId === submission.id ? 'Sending...' : 'Remind'}
+                          </button>
                         ) : (
                           <span className="text-sm text-gray-400">-</span>
                         )}
@@ -933,6 +995,13 @@ export default function FormDetailPage({ params }: { params: Promise<{ id: strin
                 {duplicating ? 'Duplicating...' : '📋 Duplicate Form'}
               </button>
             )}
+            <Link
+              href={`/teacher/forms/${form.id}/roster`}
+              className="py-2 font-medium text-gray-600 hover:text-gray-900"
+              style={{ minHeight: '44px' }}
+            >
+              🚌 Trip roster
+            </Link>
             <Link
               href={`/teacher/forms/${form.id}/print`}
               className="py-2 font-medium text-gray-600 hover:text-gray-900"

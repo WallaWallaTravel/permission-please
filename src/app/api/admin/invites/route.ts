@@ -29,7 +29,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    if (user.role !== 'SUPER_ADMIN' && !user.schoolId) {
+      return NextResponse.json({ error: 'User must be assigned to a school' }, { status: 403 });
+    }
+
     const invites = await prisma.invite.findMany({
+      where: user.role === 'SUPER_ADMIN' ? {} : { schoolId: user.schoolId },
       orderBy: { createdAt: 'desc' },
       include: {
         school: {
@@ -66,6 +71,19 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const validatedData = createInviteSchema.parse(body);
+
+    if (user.role === 'ADMIN') {
+      if (!user.schoolId) {
+        return NextResponse.json({ error: 'User must be assigned to a school' }, { status: 403 });
+      }
+      if (validatedData.schoolId && validatedData.schoolId !== user.schoolId) {
+        return NextResponse.json(
+          { error: 'Cannot invite users to another school' },
+          { status: 403 }
+        );
+      }
+      validatedData.schoolId = user.schoolId;
+    }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({

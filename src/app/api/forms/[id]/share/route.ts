@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { assertCanEditForm, assertCanManageForm, authzResponse } from '@/lib/auth/school-access';
 
 const shareSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -45,11 +46,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    const isOwner = form.teacherId === user.id;
-    const isSharedWith = form.shares.some((s) => s.userId === user.id);
-
-    if (!isOwner && !isSharedWith && user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      await assertCanManageForm(user, form);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     return NextResponse.json({
@@ -88,8 +90,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    if (form.teacherId !== user.id && user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Only the form owner can share it' }, { status: 403 });
+    try {
+      await assertCanEditForm(user, form);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     const body = await request.json();
@@ -118,6 +124,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
         { error: 'Forms can only be shared with teachers and staff' },
         { status: 400 }
       );
+    }
+
+    if (user.role !== 'SUPER_ADMIN') {
+      if (!form.schoolId || !targetUser.schoolId || form.schoolId !== targetUser.schoolId) {
+        return NextResponse.json(
+          { error: 'Can only share with staff at the same school' },
+          { status: 403 }
+        );
+      }
     }
 
     // Create or update share
@@ -193,8 +208,12 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    if (form.teacherId !== user.id && user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Only the form owner can remove shares' }, { status: 403 });
+    try {
+      await assertCanEditForm(user, form);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     // Delete the share

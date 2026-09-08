@@ -72,8 +72,8 @@ export function PermissionRequestEmail({
       </Section>
 
       <Text style={smallText}>
-        Click the button above to sign in and review the form. If you did not expect
-        this email or have questions, please contact {teacherName} at {schoolName}.
+        Click the button above to review and sign on your phone. You do not need to create an
+        account. If you did not expect this email, contact {teacherName} at {schoolName}.
       </Text>
     </EmailLayout>
   );

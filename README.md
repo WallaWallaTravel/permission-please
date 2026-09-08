@@ -8,7 +8,7 @@ Teachers create permission forms. Parents sign digitally from any device. Everyo
 
 - **Teachers**: Create forms in minutes, track who's signed, send reminders
 - **Parents**: Sign from phone/tablet with finger, no paper to lose
-- **Schools**: Digital records, audit trails, FERPA-compliant
+- **Schools**: Digital records, audit trails, school-scoped access
 
 ## Quick Start
 

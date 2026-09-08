@@ -220,6 +220,12 @@ export const rateLimitPresets = {
 
   // Health checks (lenient)
   health: { max: 1000, windowMs: 60000 },
+
+  // Public sign-link token lookups (stricter than general API)
+  signLink: { max: 20, windowMs: 60000 },
+
+  // Public data-deletion requests
+  privacyRequest: { max: 5, windowMs: 60 * 60 * 1000 },
 };
 
 /**

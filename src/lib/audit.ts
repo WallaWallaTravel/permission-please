@@ -1,9 +1,8 @@
 /**
  * Audit Logging System for Permission Please
  *
- * FERPA/COPPA Compliance Requirement:
- * Schools must maintain records of who accessed student data and when.
- * This system logs all significant actions for compliance and security.
+ * Schools need a record of who accessed student data and when.
+ * This logs significant actions. It is not a FERPA certification.
  */
 
 import { prisma } from './db';
@@ -34,7 +33,8 @@ export type AuditAction =
   | 'STUDENT_LINK_PARENT'
   // Data Export
   | 'DATA_EXPORT'
-  | 'REPORT_GENERATE';
+  | 'REPORT_GENERATE'
+  | 'DATA_DELETION_REQUEST';
 
 export type AuditSeverity = 'low' | 'medium' | 'high' | 'critical';
 
@@ -75,12 +75,13 @@ const actionSeverity: Record<AuditAction, AuditSeverity> = {
   STUDENT_LINK_PARENT: 'high',
   DATA_EXPORT: 'critical',
   REPORT_GENERATE: 'medium',
+  DATA_DELETION_REQUEST: 'high',
 };
 
 /**
  * Log an audit event
  *
- * For schools/FERPA compliance, all significant actions involving
+ * For school records, significant actions involving
  * student data must be logged with:
  * - Who performed the action
  * - What action was taken
@@ -154,7 +155,7 @@ export async function auditLog(params: AuditLogParams): Promise<void> {
 /**
  * Mask IP address for privacy (keep first octets for geo-location)
  */
-function maskIpAddress(ip: string): string {
+export function maskIpAddress(ip: string): string {
   if (ip.includes('.')) {
     // IPv4: Keep first two octets
     const parts = ip.split('.');
@@ -182,10 +183,10 @@ export function getRequestContext(request: Request): {
   userAgent: string;
 } {
   const forwarded = request.headers.get('x-forwarded-for');
-  const ipAddress = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
+  const rawIp = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 
-  return { ipAddress, userAgent };
+  return { ipAddress: maskIpAddress(rawIp), userAgent };
 }
 
 /**

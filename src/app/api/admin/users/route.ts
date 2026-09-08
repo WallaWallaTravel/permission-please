@@ -20,20 +20,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get query params
     const { searchParams } = new URL(request.url);
     const requestedSchoolId = searchParams.get('schoolId');
 
-    // Enforce school isolation for non-SUPER_ADMIN users
-    // SUPER_ADMIN can see all, ADMIN can only see their school
-    let effectiveSchoolId: string | null = null;
-    if (user.role === 'SUPER_ADMIN') {
-      effectiveSchoolId = requestedSchoolId; // SUPER_ADMIN can filter or see all
-    } else if (user.schoolId) {
-      effectiveSchoolId = user.schoolId; // ADMIN sees only their school
+    if (user.role !== 'SUPER_ADMIN' && !user.schoolId) {
+      return NextResponse.json({ error: 'User must be assigned to a school' }, { status: 403 });
     }
 
-    // Build where clause with school isolation
+    const effectiveSchoolId = user.role === 'SUPER_ADMIN' ? requestedSchoolId : user.schoolId;
+
     const where = effectiveSchoolId ? { schoolId: effectiveSchoolId } : {};
 
     const users = await prisma.user.findMany({

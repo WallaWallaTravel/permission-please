@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { assertSameSchool, authzResponse } from '@/lib/auth/school-access';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -47,9 +48,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
 
-    // Check that user belongs to same school
-    if (group.schoolId !== user.schoolId && user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      assertSameSchool(user, group.schoolId);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     return NextResponse.json({
@@ -93,8 +97,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
 
-    if (existingGroup.schoolId !== user.schoolId && user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      assertSameSchool(user, existingGroup.schoolId);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     const body = await request.json();
@@ -119,6 +127,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { status: 400 }
       );
     }
+
+    const authz = authzResponse(error);
+    if (authz) return authz;
 
     logger.error('Error updating group', error as Error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -150,8 +161,12 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
 
-    if (existingGroup.schoolId !== user.schoolId && user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      assertSameSchool(user, existingGroup.schoolId);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     // Delete group (members will cascade delete due to FK constraint)

@@ -288,4 +288,36 @@ describe('POST /api/students', () => {
 
     expect(response.status).toBe(200);
   });
+
+  it('rejects attaching a staff email as a parent', async () => {
+    vi.resetModules();
+    currentSession = mockTeacherSession;
+    const { POST } = await import('@/app/api/students/route');
+
+    mockPrismaClient.user.findUnique
+      .mockResolvedValueOnce({ schoolId: 'school-1' })
+      .mockResolvedValueOnce({
+        id: 'teacher-123',
+        email: 'teacher@school.edu',
+        name: 'Test Teacher',
+        role: 'TEACHER',
+      });
+    mockPrismaClient.$transaction.mockImplementation((fn) => fn(mockPrismaClient));
+
+    const request = createNextRequest('http://localhost:6001/api/students', {
+      method: 'POST',
+      body: {
+        name: 'New Student',
+        grade: '3rd',
+        parentName: 'Not A Parent',
+        parentEmail: 'teacher@school.edu',
+      },
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toMatch(/staff account/i);
+    expect(mockPrismaClient.student.create).not.toHaveBeenCalled();
+  });
 });

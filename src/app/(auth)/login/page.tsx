@@ -52,6 +52,8 @@ function LoginForm() {
         router.push('/admin/dashboard');
       } else if (role === 'PARENT') {
         router.push('/parent/dashboard');
+      } else if (role === 'REVIEWER') {
+        router.push('/reviewer/dashboard');
       } else {
         router.push('/teacher/dashboard');
       }

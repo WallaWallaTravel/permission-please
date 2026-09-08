@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { assertCanManageStudent, authzResponse } from '@/lib/auth/school-access';
 
 const updateStudentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long').optional(),
@@ -65,6 +66,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
+    try {
+      assertCanManageStudent(
+        { id: session.user.id, role: session.user.role, schoolId: session.user.schoolId },
+        student
+      );
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
+    }
+
     return NextResponse.json({ student });
   } catch (error) {
     logger.error('Error fetching student', error as Error);
@@ -101,6 +113,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (!existingStudent) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+    }
+
+    try {
+      assertCanManageStudent(
+        { id: session.user.id, role: session.user.role, schoolId: session.user.schoolId },
+        existingStudent
+      );
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     // Update student
@@ -185,6 +208,17 @@ export async function DELETE(
 
     if (!student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+    }
+
+    try {
+      assertCanManageStudent(
+        { id: session.user.id, role: session.user.role, schoolId: session.user.schoolId },
+        student
+      );
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     // Warn if student has form submissions (but still allow delete)

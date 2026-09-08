@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { prisma } from '@/lib/db';
 import { format } from 'date-fns';
 import { PrintFormClient } from './PrintFormClient';
+import { assertCanManageForm } from '@/lib/auth/school-access';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -16,11 +17,6 @@ export default async function PrintFormPage({ params }: PageProps) {
     redirect('/login');
   }
 
-  if (user.role !== 'TEACHER' && user.role !== 'ADMIN') {
-    redirect('/login');
-  }
-
-  // Fetch the form
   const form = await prisma.permissionForm.findUnique({
     where: { id },
     include: {
@@ -36,9 +32,6 @@ export default async function PrintFormPage({ params }: PageProps) {
       documents: {
         orderBy: { order: 'asc' },
       },
-      shares: {
-        where: { userId: user.id },
-      },
     },
   });
 
@@ -46,12 +39,10 @@ export default async function PrintFormPage({ params }: PageProps) {
     notFound();
   }
 
-  // Check permissions
-  const isOwner = form.teacherId === user.id;
-  const hasAccess = isOwner || form.shares.length > 0 || user.role === 'ADMIN';
-
-  if (!hasAccess) {
-    redirect('/teacher/forms');
+  try {
+    await assertCanManageForm(user, form);
+  } catch {
+    redirect('/teacher/dashboard');
   }
 
   return (

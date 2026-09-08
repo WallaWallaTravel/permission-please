@@ -4,8 +4,8 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { sendReminder } from '@/lib/email/resend';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
-
-const APP_URL = process.env.NEXTAUTH_URL || 'https://permissionplease.app';
+import { upsertSignLink, signLinkUrl } from '@/lib/tokens/sign-link';
+import { schoolCanSend } from '@/lib/auth/license';
 
 // POST /api/forms/bulk-remind - Send reminders for multiple forms
 export async function POST(request: NextRequest) {
@@ -39,10 +39,18 @@ export async function POST(request: NextRequest) {
       where: {
         id: { in: formIds },
         status: 'ACTIVE',
-        OR: [{ teacherId: user.id }, { shares: { some: { userId: user.id, canEdit: true } } }],
+        ...(user.role === 'ADMIN' && user.schoolId
+          ? { schoolId: user.schoolId }
+          : {
+              OR: [
+                { teacherId: user.id },
+                { shares: { some: { userId: user.id, canEdit: true } } },
+              ],
+            }),
       },
       include: {
         teacher: { select: { name: true } },
+        school: { select: { isActive: true, licensedThrough: true } },
         submissions: {
           where: { status: 'PENDING' },
           include: {
@@ -57,6 +65,10 @@ export async function POST(request: NextRequest) {
     let totalErrors = 0;
 
     for (const form of forms) {
+      if (!schoolCanSend(form.school).ok) {
+        continue;
+      }
+
       const deadline = new Date(form.deadline);
       const now = new Date();
       const hoursRemaining = Math.max(
@@ -70,20 +82,21 @@ export async function POST(request: NextRequest) {
         const batch = form.submissions.slice(i, i + 5);
 
         const results = await Promise.allSettled(
-          batch.map((submission) =>
-            sendReminder({
+          batch.map(async (submission) => {
+            const token = await upsertSignLink(form.id, submission.parentId, deadline);
+            return sendReminder({
               parentEmail: submission.parent.email,
               parentName: submission.parent.name || 'Parent',
               studentName: submission.student.name,
               formTitle: form.title,
               eventDate: new Date(form.eventDate),
               deadline,
-              signUrl: `${APP_URL}/parent/sign/${form.id}`,
+              signUrl: signLinkUrl(token),
               teacherName: form.teacher.name || 'Teacher',
               daysRemaining,
               hoursRemaining,
-            })
-          )
+            });
+          })
         );
 
         for (const result of results) {

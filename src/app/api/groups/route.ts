@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { authzResponse, requireStaffSchool, schoolWhere } from '@/lib/auth/school-access';
 
 const createGroupSchema = z.object({
   name: z.string().min(1, 'Group name is required').max(100),
@@ -26,9 +27,7 @@ export async function GET(request: NextRequest) {
     }
 
     const groups = await prisma.studentGroup.findMany({
-      where: {
-        schoolId: user.schoolId,
-      },
+      where: schoolWhere(user),
       include: {
         members: {
           include: {
@@ -59,6 +58,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ groups: groupsWithCounts });
   } catch (error) {
+    const authz = authzResponse(error);
+    if (authz) return authz;
     logger.error('Error fetching groups', error as Error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -80,13 +81,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const schoolId = requireStaffSchool(user);
+
     const body = await request.json();
     const validatedData = createGroupSchema.parse(body);
 
     const group = await prisma.studentGroup.create({
       data: {
         name: validatedData.name,
-        schoolId: user.schoolId,
+        schoolId,
       },
     });
 
@@ -105,6 +108,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const authz = authzResponse(error);
+    if (authz) return authz;
 
     logger.error('Error creating group', error as Error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

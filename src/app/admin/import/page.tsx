@@ -431,15 +431,14 @@ export default function ImportPage() {
           </div>
 
           {/* Note about default password */}
-          <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
             <div>
-              <p className="font-medium text-amber-800">Default Password Set</p>
-              <p className="text-sm text-amber-700">
-                New parent accounts were created with the default password:{' '}
-                <code className="rounded bg-amber-100 px-1">Welcome123!</code>
+              <p className="font-medium text-blue-800">Parents sign from email</p>
+              <p className="text-sm text-blue-700">
+                New parent records have no password. They sign permission slips from the link in the
+                request email — they do not need to create an account first.
               </p>
-              <p className="text-sm text-amber-700">Parents should change this on first login.</p>
             </div>
           </div>
 

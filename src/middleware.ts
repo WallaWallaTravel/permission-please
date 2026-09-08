@@ -6,7 +6,7 @@ import { getToken } from 'next-auth/jwt';
 const protectedRoutes = ['/teacher', '/parent', '/admin', '/reviewer'];
 
 // Routes that should redirect authenticated users
-const authRoutes = ['/login', '/signup'];
+const authRoutes = ['/login'];
 
 // Role-based route access
 const roleRoutes: Record<string, string[]> = {
@@ -59,6 +59,7 @@ export async function middleware(request: NextRequest) {
   // Skip API routes, static files, Next.js internals, and test pages
   if (
     pathname.startsWith('/api') ||
+    pathname.startsWith('/s/') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
     pathname.startsWith('/sentry-test') ||

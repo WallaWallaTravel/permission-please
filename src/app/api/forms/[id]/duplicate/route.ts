@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { assertCanManageForm, authzResponse } from '@/lib/auth/school-access';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -42,7 +43,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     }
 
-    // Only owner can duplicate
+    try {
+      await assertCanManageForm(user, original);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
+    }
+
+    // Only owner can duplicate (admins of the same school already passed school checks)
     if (original.teacherId !== user.id && user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -132,6 +141,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       { status: 201 }
     );
   } catch (error) {
+    const authz = authzResponse(error);
+    if (authz) return authz;
     logger.error('Error duplicating form', error as Error);
     return NextResponse.json({ error: 'Failed to duplicate form' }, { status: 500 });
   }

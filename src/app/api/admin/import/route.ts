@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
-import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { ParentIdentityError, resolveOrCreateParent } from '@/lib/auth/parent-identity';
 
 const studentRowSchema = z.object({
   name: z.string().min(1, 'Student name is required'),
@@ -42,24 +42,33 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { data, schoolId } = body;
+    const { data, schoolId: requestedSchoolId } = body;
 
     if (!Array.isArray(data) || data.length === 0) {
       return NextResponse.json({ error: 'No data provided' }, { status: 400 });
     }
 
-    // Validate school exists if provided
-    if (schoolId) {
-      const school = await prisma.school.findUnique({
-        where: { id: schoolId },
-      });
-      if (!school) {
-        return NextResponse.json({ error: 'School not found' }, { status: 404 });
+    let schoolId: string | null = requestedSchoolId || null;
+    if (user.role === 'ADMIN') {
+      if (!user.schoolId) {
+        return NextResponse.json({ error: 'User must be assigned to a school' }, { status: 403 });
       }
+      schoolId = user.schoolId;
+    }
+
+    if (!schoolId) {
+      return NextResponse.json({ error: 'A school is required for import' }, { status: 400 });
+    }
+
+    // Validate school exists if provided
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+    });
+    if (!school) {
+      return NextResponse.json({ error: 'School not found' }, { status: 404 });
     }
 
     const results: ImportResult[] = [];
-    const defaultPassword = await bcrypt.hash('Welcome123!', 12);
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
@@ -69,29 +78,16 @@ export async function POST(request: NextRequest) {
         // Validate row data
         const validatedRow = studentRowSchema.parse(row);
 
-        // Check if parent already exists
-        let parent = await prisma.user.findUnique({
-          where: { email: validatedRow.parentEmail },
+        const { parent } = await resolveOrCreateParent(prisma as never, {
+          email: validatedRow.parentEmail,
+          name: validatedRow.parentName,
+          schoolId,
         });
 
-        if (!parent) {
-          // Create parent with default password
-          parent = await prisma.user.create({
-            data: {
-              email: validatedRow.parentEmail,
-              name: validatedRow.parentName,
-              password: defaultPassword,
-              role: 'PARENT',
-              schoolId: schoolId || null,
-            },
-          });
-        }
-
-        // Check if student already exists (by name + school)
         const existingStudent = await prisma.student.findFirst({
           where: {
             name: validatedRow.name,
-            schoolId: schoolId || null,
+            schoolId,
           },
         });
 
@@ -104,7 +100,7 @@ export async function POST(request: NextRequest) {
             data: {
               name: validatedRow.name,
               grade: validatedRow.grade,
-              schoolId: schoolId || null,
+              schoolId,
             },
           });
         }
@@ -142,6 +138,12 @@ export async function POST(request: NextRequest) {
             row: rowNum,
             error: error.issues.map((i) => i.message).join(', '),
           });
+        } else if (error instanceof ParentIdentityError) {
+          results.push({
+            success: false,
+            row: rowNum,
+            error: error.message,
+          });
         } else {
           results.push({
             success: false,
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
           totalRows: data.length,
           successCount,
           errorCount,
-          schoolId: schoolId || null,
+          schoolId,
         },
       },
     });

@@ -39,7 +39,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const schoolFilter =
+      user.role === 'SUPER_ADMIN' ? {} : user.schoolId ? { id: user.schoolId } : { id: '__none__' };
+
     const schools = await prisma.school.findMany({
+      where: schoolFilter,
       orderBy: { name: 'asc' },
       include: {
         _count: {

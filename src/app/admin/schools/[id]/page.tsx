@@ -13,6 +13,7 @@ interface School {
   logoUrl: string | null;
   primaryColor: string | null;
   isActive: boolean;
+  licensedThrough: string | null;
   createdAt: string;
   _count: {
     users: number;
@@ -37,6 +38,7 @@ export default function EditSchoolPage({ params }: { params: Promise<{ id: strin
     subdomain: '',
     primaryColor: '#1e3a5f',
     isActive: true,
+    licensedThrough: '',
   });
 
   useEffect(() => {
@@ -53,6 +55,9 @@ export default function EditSchoolPage({ params }: { params: Promise<{ id: strin
           subdomain: data.school.subdomain,
           primaryColor: data.school.primaryColor || '#1e3a5f',
           isActive: data.school.isActive,
+          licensedThrough: data.school.licensedThrough
+            ? String(data.school.licensedThrough).slice(0, 10)
+            : '',
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -74,7 +79,10 @@ export default function EditSchoolPage({ params }: { params: Promise<{ id: strin
       const response = await fetch(`/api/admin/schools/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          licensedThrough: formData.licensedThrough || null,
+        }),
       });
 
       const data = await response.json();
@@ -231,6 +239,28 @@ export default function EditSchoolPage({ params }: { params: Promise<{ id: strin
                   className="flex-1 rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="licensedThrough"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Licensed through
+              </label>
+              <input
+                type="date"
+                id="licensedThrough"
+                value={formData.licensedThrough}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, licensedThrough: e.target.value }))
+                }
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Leave blank for a legacy school that can still send slips. An expired date blocks
+                new sends until you renew.
+              </p>
             </div>
 
             <div className="flex items-center gap-3">

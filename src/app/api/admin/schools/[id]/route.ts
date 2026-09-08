@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth/utils';
 import { z } from 'zod';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { parseLicenseDate } from '@/lib/auth/license';
+import { assertSameSchool, authzResponse } from '@/lib/auth/school-access';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -24,6 +26,11 @@ const updateSchoolSchema = z.object({
     .optional()
     .nullable(),
   isActive: z.boolean().optional(),
+  licensedThrough: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
 });
 
 // GET /api/admin/schools/[id] - Get a specific school
@@ -68,6 +75,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     if (!school) {
       return NextResponse.json({ error: 'School not found' }, { status: 404 });
+    }
+
+    try {
+      if (user.role !== 'SUPER_ADMIN') {
+        assertSameSchool(user, school.id);
+      }
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     return NextResponse.json({ school });
@@ -129,6 +146,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           primaryColor: validatedData.primaryColor,
         }),
         ...(validatedData.isActive !== undefined && { isActive: validatedData.isActive }),
+        ...(validatedData.licensedThrough !== undefined && {
+          licensedThrough:
+            validatedData.licensedThrough === null
+              ? null
+              : parseLicenseDate(validatedData.licensedThrough),
+        }),
       },
     });
 

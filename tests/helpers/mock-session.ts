@@ -19,6 +19,7 @@ export const mockTeacherSession = {
     email: 'teacher@school.edu',
     name: 'Test Teacher',
     role: 'TEACHER' as const,
+    schoolId: 'school-123',
   },
   expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };
@@ -29,6 +30,7 @@ export const mockParentSession = {
     email: 'parent@example.com',
     name: 'Test Parent',
     role: 'PARENT' as const,
+    schoolId: null,
   },
   expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };
@@ -39,6 +41,18 @@ export const mockAdminSession = {
     email: 'admin@school.edu',
     name: 'Admin User',
     role: 'ADMIN' as const,
+    schoolId: 'school-123',
+  },
+  expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+};
+
+export const mockSuperAdminSession = {
+  user: {
+    id: 'super-123',
+    email: 'ryan@permissionplease.app',
+    name: 'Super Admin',
+    role: 'SUPER_ADMIN' as const,
+    schoolId: null,
   },
   expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };

@@ -2,24 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { sendReminder } from '@/lib/email/resend';
 import { logger } from '@/lib/logger';
+import { upsertSignLink, signLinkUrl } from '@/lib/tokens/sign-link';
+import { schoolCanSend } from '@/lib/auth/license';
 
-// Vercel Cron Job - runs every 2 hours to support hourly reminders
-// Configure in vercel.json: { "crons": [{ "path": "/api/cron/reminders", "schedule": "0 */2 * * *" }] }
+// Vercel Cron Job - daily at 09:00 UTC (see vercel.json)
+// Day-based reminders match calendar days so a daily cron cannot miss the window.
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // 60 seconds max for cron jobs
+export const maxDuration = 60;
 
-// Verify the request is from Vercel Cron
 function verifyCronAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
 
-  // In production, verify Vercel's CRON_SECRET
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.CRON_SECRET) {
+      return false;
+    }
+    return authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  }
+
   if (process.env.CRON_SECRET) {
     return authHeader === `Bearer ${process.env.CRON_SECRET}`;
   }
 
-  // In development, allow without auth
-  return process.env.NODE_ENV === 'development';
+  return true;
 }
 
 // Types for reminder schedule
@@ -35,25 +41,25 @@ const DEFAULT_SCHEDULE: ReminderInterval[] = [
   { value: 1, unit: 'days' },
 ];
 
-// Convert interval to hours for consistent comparison
-function intervalToHours(interval: ReminderInterval): number {
-  if (interval.unit === 'hours') {
-    return interval.value;
-  }
-  return interval.value * 24;
+function startOfUtcDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-// Check if a reminder should be sent based on time remaining and schedule
-// Uses a tolerance window to account for cron timing variations
+function calendarDaysRemaining(deadline: Date, now: Date): number {
+  const start = startOfUtcDay(now).getTime();
+  const end = startOfUtcDay(deadline).getTime();
+  return Math.round((end - start) / (1000 * 60 * 60 * 24));
+}
+
 function shouldSendReminder(
-  hoursRemaining: number,
-  schedule: ReminderInterval[],
-  toleranceHours: number = 2 // 2-hour window since cron runs every 2 hours
+  daysRemaining: number,
+  schedule: ReminderInterval[]
 ): ReminderInterval | null {
   for (const interval of schedule) {
-    const targetHours = intervalToHours(interval);
-    // Check if we're within the tolerance window of this reminder time
-    if (hoursRemaining <= targetHours && hoursRemaining > targetHours - toleranceHours) {
+    if (interval.unit === 'days' && daysRemaining === interval.value) {
+      return interval;
+    }
+    if (interval.unit === 'hours' && daysRemaining === 0 && interval.value <= 24) {
       return interval;
     }
   }
@@ -98,11 +104,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Skipped - email service not configured',
-      sent: 0
+      sent: 0,
     });
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:6001';
   const now = new Date();
 
   try {
@@ -128,7 +133,7 @@ export async function GET(request: NextRequest) {
         eventDate: true,
         reminderSchedule: true,
         teacher: { select: { name: true } },
-        school: { select: { name: true } },
+        school: { select: { name: true, isActive: true, licensedThrough: true } },
       },
     });
 
@@ -137,7 +142,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'No forms requiring reminders',
-        sent: 0
+        sent: 0,
       });
     }
 
@@ -146,25 +151,26 @@ export async function GET(request: NextRequest) {
     const results: Array<{ formId: string; sent: number; errors: number; interval?: string }> = [];
 
     for (const form of activeForms) {
+      if (!schoolCanSend(form.school).ok) {
+        continue;
+      }
+
       // Parse the form's custom reminder schedule
       const schedule = parseReminderSchedule(form.reminderSchedule);
 
-      // Calculate hours remaining until deadline
       const deadlineDate = new Date(form.deadline);
-      const hoursRemaining = (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-      // Check if we should send a reminder based on the schedule
-      const matchedInterval = shouldSendReminder(hoursRemaining, schedule);
+      const daysRemaining = calendarDaysRemaining(deadlineDate, now);
+      const matchedInterval = shouldSendReminder(daysRemaining, schedule);
 
       if (!matchedInterval) {
         continue;
       }
 
-      // Get all pending submissions for this form
       const pendingSubmissions = await prisma.formSubmission.findMany({
         where: {
           formId: form.id,
           status: 'PENDING',
+          OR: [{ lastRemindedAt: null }, { lastRemindedAt: { lt: startOfUtcDay(now) } }],
         },
         include: {
           parent: {
@@ -180,17 +186,14 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const signUrl = `${baseUrl}/parent/sign/${form.id}`;
+      const signUrlByParent = new Map<string, string>();
       let formSent = 0;
       let formErrors = 0;
 
-      // Calculate display values for the reminder
-      const daysRemaining = matchedInterval.unit === 'days'
-        ? matchedInterval.value
-        : undefined;
-      const hoursRemainingDisplay = matchedInterval.unit === 'hours'
-        ? matchedInterval.value
-        : undefined;
+      const daysRemainingDisplay =
+        matchedInterval.unit === 'days' ? matchedInterval.value : daysRemaining;
+      const hoursRemainingDisplay =
+        matchedInterval.unit === 'hours' ? matchedInterval.value : undefined;
 
       // Send reminders in batches to avoid rate limits
       const batchSize = 5;
@@ -200,6 +203,12 @@ export async function GET(request: NextRequest) {
         await Promise.allSettled(
           batch.map(async (submission) => {
             try {
+              let signUrl = signUrlByParent.get(submission.parent.id);
+              if (!signUrl) {
+                const token = await upsertSignLink(form.id, submission.parent.id, deadlineDate);
+                signUrl = signLinkUrl(token);
+                signUrlByParent.set(submission.parent.id, signUrl);
+              }
               await sendReminder({
                 parentEmail: submission.parent.email,
                 parentName: submission.parent.name,
@@ -210,8 +219,12 @@ export async function GET(request: NextRequest) {
                 signUrl,
                 teacherName: form.teacher.name,
                 schoolName: form.school?.name,
-                daysRemaining,
+                daysRemaining: daysRemainingDisplay,
                 hoursRemaining: hoursRemainingDisplay,
+              });
+              await prisma.formSubmission.update({
+                where: { id: submission.id },
+                data: { lastRemindedAt: now },
               });
               formSent++;
             } catch (err) {

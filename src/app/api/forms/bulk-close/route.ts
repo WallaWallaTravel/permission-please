@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.role !== 'TEACHER' && user.role !== 'ADMIN') {
+    if (user.role !== 'TEACHER' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -31,15 +31,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Maximum 50 forms per batch' }, { status: 400 });
     }
 
-    // Only close ACTIVE forms owned by the requesting teacher (or shared with edit) or admin
+    // Only close ACTIVE forms the caller can manage in their school
     const whereClause = {
       id: { in: formIds },
       status: 'ACTIVE' as const,
-      ...(user.role === 'ADMIN'
+      ...(user.role === 'SUPER_ADMIN'
         ? {}
-        : {
-            OR: [{ teacherId: user.id }, { shares: { some: { userId: user.id, canEdit: true } } }],
-          }),
+        : user.role === 'ADMIN'
+          ? { schoolId: user.schoolId || '__none__' }
+          : {
+              OR: [
+                { teacherId: user.id },
+                { shares: { some: { userId: user.id, canEdit: true } } },
+              ],
+              ...(user.schoolId ? { schoolId: user.schoolId } : {}),
+            }),
     };
 
     // Get forms to close (for audit logging)

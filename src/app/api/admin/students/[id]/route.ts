@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/utils';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { assertCanManageStudent, authzResponse } from '@/lib/auth/school-access';
 
 // GET /api/admin/students/[id] - Get a single student
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -41,9 +42,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // School isolation for ADMIN
-    if (user.role === 'ADMIN' && student.schoolId !== user.schoolId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      assertCanManageStudent(user, student);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     return NextResponse.json({ student });
@@ -78,9 +82,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // School isolation for ADMIN
-    if (user.role === 'ADMIN' && existingStudent.schoolId !== user.schoolId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      assertCanManageStudent(user, existingStudent);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     const body = await request.json();
@@ -158,9 +165,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // School isolation for ADMIN
-    if (user.role === 'ADMIN' && existingStudent.schoolId !== user.schoolId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    try {
+      assertCanManageStudent(user, existingStudent);
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
     }
 
     // Delete the student (cascades to submissions and parent links)

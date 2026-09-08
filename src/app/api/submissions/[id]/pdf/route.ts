@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db';
 import { generatePermissionPdf } from '@/lib/pdf/generate-permission-pdf';
 import { logger } from '@/lib/logger';
+import { getSignLinkByToken } from '@/lib/tokens/sign-link';
+import { assertCanManageForm, AuthzError } from '@/lib/auth/school-access';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -13,14 +15,9 @@ type RouteContext = {
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    const token = request.nextUrl.searchParams.get('token');
     const { id } = await context.params;
 
-    // Get the submission with all related data
     const submission = await prisma.formSubmission.findUnique({
       where: { id },
       include: {
@@ -44,21 +41,47 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Submission not found' }, { status: 404 });
     }
 
-    // Authorization: Only the parent, teacher, or admin can download
-    const isParent = submission.parentId === session.user.id;
-    const isTeacher = submission.form.teacherId === session.user.id;
-    const isAdmin = session.user.role === 'ADMIN' || session.user.role === 'SUPER_ADMIN';
+    let authorized = false;
+    let actorId: string | undefined;
 
-    if (!isParent && !isTeacher && !isAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (token) {
+      const link = await getSignLinkByToken(token);
+      if (link && link.parentId === submission.parentId && link.formId === submission.formId) {
+        authorized = true;
+        actorId = link.parentId;
+      }
     }
 
-    // Can only download signed submissions
+    if (!authorized && session?.user?.id) {
+      if (session.user.id === submission.parentId) {
+        authorized = true;
+        actorId = session.user.id;
+      } else {
+        try {
+          await assertCanManageForm(session.user, submission.form);
+          authorized = true;
+          actorId = session.user.id;
+        } catch (error) {
+          if (!(error instanceof AuthzError)) {
+            throw error;
+          }
+        }
+      }
+    }
+
+    if (!authorized) {
+      return NextResponse.json(
+        { error: session?.user?.id ? 'Forbidden' : 'Unauthorized' },
+        {
+          status: session?.user?.id ? 403 : 401,
+        }
+      );
+    }
+
     if (submission.status !== 'SIGNED' || !submission.signedAt) {
       return NextResponse.json({ error: 'Submission not yet signed' }, { status: 400 });
     }
 
-    // Generate PDF
     const pdfBytes = await generatePermissionPdf({
       formTitle: submission.form.title,
       formDescription: submission.form.description,
@@ -80,7 +103,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       })),
     });
 
-    // Generate filename
     const sanitizedTitle = submission.form.title
       .replace(/[^a-zA-Z0-9]/g, '-')
       .replace(/-+/g, '-')
@@ -90,10 +112,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     logger.info('PDF generated', {
       submissionId: id,
-      userId: session.user.id,
+      userId: actorId,
     });
 
-    // Return PDF with appropriate headers
     return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {

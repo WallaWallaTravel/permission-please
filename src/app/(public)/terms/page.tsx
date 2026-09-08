@@ -30,7 +30,7 @@ export default function TermsOfServicePage() {
       <main className="mx-auto max-w-4xl px-4 py-12">
         <div className="rounded-xl border border-slate-200 bg-white p-8 md:p-12">
           <h1 className="mb-2 text-3xl font-bold text-slate-900">Terms of Service</h1>
-          <p className="mb-8 text-slate-500">Last updated: December 2024</p>
+          <p className="mb-8 text-slate-500">Last updated: September 2026</p>
 
           <div className="prose prose-slate max-w-none">
             <section className="mb-8">
@@ -58,10 +58,13 @@ export default function TermsOfServicePage() {
             <section className="mb-8">
               <h2 className="mb-4 text-xl font-semibold text-slate-900">3. User Accounts</h2>
               <ul className="list-inside list-disc space-y-2 text-slate-600">
-                <li>You must provide accurate and complete information when creating an account</li>
-                <li>You are responsible for maintaining the confidentiality of your password</li>
+                <li>You must provide accurate and complete information when using an invite</li>
+                <li>
+                  Sign-in is invite-only via Google or a short-lived email link. There is no account
+                  password to share.
+                </li>
                 <li>You must notify us immediately of any unauthorized use of your account</li>
-                <li>You may not share your account credentials with others</li>
+                <li>You may not share a magic-link email or signed-in session with others</li>
               </ul>
             </section>
 
@@ -195,9 +198,12 @@ export default function TermsOfServicePage() {
           </div>
         </div>
 
-        <div className="mt-8 text-center">
+        <div className="mt-8 flex justify-center gap-6 text-center">
           <Link href="/privacy" className="font-medium text-blue-600 hover:text-blue-700">
             View Privacy Policy →
+          </Link>
+          <Link href="/dpa" className="font-medium text-blue-600 hover:text-blue-700">
+            Data Processing Agreement →
           </Link>
         </div>
       </main>

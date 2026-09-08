@@ -3,9 +3,22 @@ export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { Plus, Building2 } from 'lucide-react';
+import { getCurrentUser } from '@/lib/auth/utils';
+import { licenseStatusLabel, schoolLicenseStatus } from '@/lib/auth/license';
 
 export default async function SchoolsPage() {
+  const user = await getCurrentUser();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
+  const schoolFilter =
+    user?.role === 'SUPER_ADMIN'
+      ? undefined
+      : user?.schoolId
+        ? { id: user.schoolId }
+        : { id: '__none__' };
+
   const schools = await prisma.school.findMany({
+    where: schoolFilter,
     orderBy: { name: 'asc' },
     include: {
       _count: {
@@ -23,15 +36,19 @@ export default async function SchoolsPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Schools</h1>
-          <p className="mt-1 text-gray-600">Manage schools and their subdomains</p>
+          <p className="mt-1 text-gray-600">
+            Stand up a school, set the license, invite the first admin
+          </p>
         </div>
-        <Link
-          href="/admin/schools/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-        >
-          <Plus className="h-5 w-5" />
-          Add School
-        </Link>
+        {isSuperAdmin && (
+          <Link
+            href="/admin/schools/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus className="h-5 w-5" />
+            Stand up a school
+          </Link>
+        )}
       </div>
 
       {schools.length === 0 ? (
@@ -39,16 +56,17 @@ export default async function SchoolsPage() {
           <Building2 className="mx-auto mb-4 h-16 w-16 text-gray-300" />
           <h2 className="mb-2 text-xl font-semibold text-gray-900">No schools yet</h2>
           <p className="mx-auto mb-6 max-w-md text-gray-500">
-            Get started by adding your first school. Each school gets its own subdomain where
-            teachers and parents can access their forms.
+            Stand up a school to set the annual license and invite the first admin.
           </p>
-          <Link
-            href="/admin/schools/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
-          >
-            <Plus className="h-5 w-5" />
-            Add Your First School
-          </Link>
+          {isSuperAdmin && (
+            <Link
+              href="/admin/schools/new"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
+            >
+              <Plus className="h-5 w-5" />
+              Stand up your first school
+            </Link>
+          )}
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -71,7 +89,7 @@ export default async function SchoolsPage() {
                   Forms
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium tracking-wider text-gray-500 uppercase">
-                  Status
+                  License
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase">
                   Actions
@@ -109,15 +127,24 @@ export default async function SchoolsPage() {
                   <td className="px-6 py-4 text-center text-gray-600">{school._count.students}</td>
                   <td className="px-6 py-4 text-center text-gray-600">{school._count.forms}</td>
                   <td className="px-6 py-4 text-center">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                        school.isActive
+                    {(() => {
+                      const status = schoolLicenseStatus(school);
+                      const tone =
+                        status === 'licensed'
                           ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {school.isActive ? 'Active' : 'Inactive'}
-                    </span>
+                          : status === 'expired'
+                            ? 'bg-red-100 text-red-700'
+                            : status === 'inactive'
+                              ? 'bg-gray-100 text-gray-600'
+                              : 'bg-amber-100 text-amber-800';
+                      return (
+                        <span
+                          className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${tone}`}
+                        >
+                          {licenseStatusLabel(status)}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <Link

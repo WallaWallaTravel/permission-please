@@ -19,8 +19,9 @@ interface DistributeModalProps {
 export function DistributeModal({ formId, isOpen, onClose, onSuccess }: DistributeModalProps) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
-  const [distributionMode, setDistributionMode] = useState<'all' | 'groups'>('all');
+  const [distributionMode, setDistributionMode] = useState<'all' | 'groups'>('groups');
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [confirmEntireSchool, setConfirmEntireSchool] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;
@@ -64,9 +65,18 @@ export function DistributeModal({ formId, isOpen, onClose, onSuccess }: Distribu
     setResult(null);
 
     try {
-      const body: { groupIds?: string[] } = {};
+      const body: { groupIds?: string[]; entireSchool?: boolean } = {};
       if (distributionMode === 'groups' && selectedGroups.size > 0) {
         body.groupIds = Array.from(selectedGroups);
+      } else if (distributionMode === 'all' && confirmEntireSchool) {
+        body.entireSchool = true;
+      } else {
+        setResult({
+          success: false,
+          message: 'Choose a group, or confirm sending to the entire school.',
+        });
+        setIsSubmitting(false);
+        return;
       }
 
       const res = await fetch(`/api/forms/${formId}/distribute`, {
@@ -105,7 +115,10 @@ export function DistributeModal({ formId, isOpen, onClose, onSuccess }: Distribu
 
   const getPreviewText = () => {
     if (distributionMode === 'all') {
-      return 'Will send to all students with linked parents';
+      if (!confirmEntireSchool) {
+        return 'Check the box below to confirm sending to every linked parent in the school';
+      }
+      return 'Will send to all students with linked parents at this school';
     }
     if (selectedGroups.size === 0) {
       return 'Select at least one group';
@@ -150,27 +163,6 @@ export function DistributeModal({ formId, isOpen, onClose, onSuccess }: Distribu
 
           {/* Distribution Mode Selection */}
           <div className="space-y-3">
-            {/* All Students Option */}
-            <label
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-4 transition ${
-                distributionMode === 'all'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <input
-                type="radio"
-                name="mode"
-                checked={distributionMode === 'all'}
-                onChange={() => setDistributionMode('all')}
-                className="h-4 w-4 text-blue-600"
-              />
-              <div>
-                <p className="font-medium text-gray-900">All Students</p>
-                <p className="text-sm text-gray-600">Send to all students with linked parents</p>
-              </div>
-            </label>
-
             {/* Select Groups Option */}
             {!loadingGroups && groups.length > 0 && (
               <label
@@ -190,10 +182,9 @@ export function DistributeModal({ formId, isOpen, onClose, onSuccess }: Distribu
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">Select Groups</p>
                   <p className="mb-3 text-sm text-gray-600">
-                    Choose specific groups to receive this form
+                    Send only to a class, team, or trip group
                   </p>
 
-                  {/* Group Checkboxes */}
                   {distributionMode === 'groups' && (
                     <div className="space-y-2">
                       {groups.map((group) => (
@@ -223,6 +214,40 @@ export function DistributeModal({ formId, isOpen, onClose, onSuccess }: Distribu
                 </div>
               </label>
             )}
+
+            {/* All Students Option */}
+            <label
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition ${
+                distributionMode === 'all'
+                  ? 'border-amber-500 bg-amber-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <input
+                type="radio"
+                name="mode"
+                checked={distributionMode === 'all'}
+                onChange={() => setDistributionMode('all')}
+                className="mt-1 h-4 w-4 text-blue-600"
+              />
+              <div>
+                <p className="font-medium text-gray-900">Entire school</p>
+                <p className="text-sm text-gray-600">
+                  Every student with a linked parent. Use only when that is really the list.
+                </p>
+                {distributionMode === 'all' && (
+                  <label className="mt-3 flex items-start gap-2 text-sm text-amber-900">
+                    <input
+                      type="checkbox"
+                      checked={confirmEntireSchool}
+                      onChange={(e) => setConfirmEntireSchool(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded text-amber-600"
+                    />
+                    I understand this emails the whole school
+                  </label>
+                )}
+              </div>
+            </label>
 
             {/* No Groups Message */}
             {!loadingGroups && groups.length === 0 && (
@@ -288,7 +313,11 @@ export function DistributeModal({ formId, isOpen, onClose, onSuccess }: Distribu
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || (distributionMode === 'groups' && selectedGroups.size === 0)}
+            disabled={
+              isSubmitting ||
+              (distributionMode === 'groups' && selectedGroups.size === 0) ||
+              (distributionMode === 'all' && !confirmEntireSchool)
+            }
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {isSubmitting ? (

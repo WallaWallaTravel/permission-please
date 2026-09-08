@@ -5,6 +5,8 @@ import { prisma } from '@/lib/db';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { assertCanManageStudent, authzResponse } from '@/lib/auth/school-access';
+import { ParentIdentityError, resolveOrCreateParent } from '@/lib/auth/parent-identity';
 
 // Schema for linking existing parent OR creating new one
 const linkParentSchema = z
@@ -51,6 +53,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
+    try {
+      assertCanManageStudent(
+        { id: session.user.id, role: session.user.role, schoolId: session.user.schoolId },
+        student
+      );
+    } catch (error) {
+      const authz = authzResponse(error);
+      if (authz) return authz;
+      throw error;
+    }
+
     let parentId: string;
     let isNewParent = false;
 
@@ -72,34 +85,19 @@ export async function POST(request: NextRequest) {
     }
     // Case 2: Create new parent/guardian
     else if (validatedData.parentName && validatedData.parentEmail) {
-      const email = validatedData.parentEmail.toLowerCase();
-
-      // Check if user already exists with this email
-      const existingUser = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (existingUser) {
-        if (existingUser.role !== 'PARENT') {
-          return NextResponse.json(
-            { error: 'A user with this email exists but is not a parent account' },
-            { status: 400 }
-          );
-        }
-        // Use existing parent account
-        parentId = existingUser.id;
-      } else {
-        // Create new parent account
-        const newParent = await prisma.user.create({
-          data: {
-            email,
-            name: validatedData.parentName,
-            role: 'PARENT',
-            schoolId: student.schoolId,
-          },
+      try {
+        const result = await resolveOrCreateParent(prisma as never, {
+          email: validatedData.parentEmail,
+          name: validatedData.parentName,
+          schoolId: student.schoolId,
         });
-        parentId = newParent.id;
-        isNewParent = true;
+        parentId = result.parent.id;
+        isNewParent = result.created;
+      } catch (error) {
+        if (error instanceof ParentIdentityError) {
+          return NextResponse.json({ error: error.message }, { status: error.status });
+        }
+        throw error;
       }
     } else {
       return NextResponse.json(

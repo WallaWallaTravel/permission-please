@@ -14,15 +14,9 @@ export default function HomePage() {
             <div className="flex items-center gap-4">
               <Link
                 href="/login"
-                className="font-medium text-slate-600 transition hover:text-slate-900"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/signup"
                 className="rounded-lg bg-blue-600 px-5 py-2 font-medium text-white shadow-sm transition hover:bg-blue-700"
               >
-                Get Started
+                Sign In
               </Link>
             </div>
           </div>
@@ -34,7 +28,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-5xl text-center">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
             <span className="h-2 w-2 rounded-full bg-blue-600" />
-            Now Available for Schools
+            Invite-only for schools we work with
           </div>
 
           <h1 className="mb-6 text-5xl leading-tight font-bold text-slate-900 sm:text-6xl">
@@ -50,10 +44,10 @@ export default function HomePage() {
 
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              href="/signup"
+              href="/login"
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 sm:w-auto"
             >
-              Start Free Trial
+              Sign in
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
@@ -70,6 +64,9 @@ export default function HomePage() {
               See How It Works
             </Link>
           </div>
+          <p className="mt-6 text-sm text-slate-500">
+            Accounts are created by your school. There is no public signup or free trial.
+          </p>
         </div>
       </section>
 
@@ -192,9 +189,10 @@ export default function HomePage() {
                   />
                 </svg>
               </div>
-              <h3 className="mb-2 text-lg font-semibold text-slate-900">Secure & Private</h3>
+              <h3 className="mb-2 text-lg font-semibold text-slate-900">Built for school data</h3>
               <p className="text-slate-600">
-                Bank-level encryption. FERPA compliant. Your data stays protected.
+                Access is invite-only and scoped to your school. Encryption in transit. We do not
+                claim FERPA certification.
               </p>
             </div>
 
@@ -224,16 +222,17 @@ export default function HomePage() {
         <div className="mx-auto max-w-4xl text-center">
           <div className="rounded-2xl bg-blue-600 p-12 shadow-xl">
             <h2 className="mb-4 text-3xl font-bold text-white sm:text-4xl">
-              Ready to Go Paperless?
+              Ready to skip the paper chase?
             </h2>
             <p className="mx-auto mb-8 max-w-xl text-lg text-blue-100">
-              Join schools making permission slips simple. Start your free trial today.
+              If your school already has access, sign in. If you want to talk about using this for
+              trips, reach out — we work with schools by invitation.
             </p>
             <Link
-              href="/signup"
+              href="/login"
               className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-lg font-semibold text-blue-600 transition hover:bg-blue-50"
             >
-              Get Started Free
+              Sign in
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
@@ -258,6 +257,9 @@ export default function HomePage() {
           <div className="flex gap-6">
             <a href="/privacy" className="hover:text-slate-700">
               Privacy
+            </a>
+            <a href="/dpa" className="hover:text-slate-700">
+              DPA
             </a>
             <a href="/terms" className="hover:text-slate-700">
               Terms

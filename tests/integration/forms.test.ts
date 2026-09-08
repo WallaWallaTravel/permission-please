@@ -244,6 +244,19 @@ describe('GET /api/forms/[id]', () => {
 
     expect(response.status).toBe(403);
   });
+
+  it('returns 403 when a parent fetches a form by id', async () => {
+    const { GET } = await import('@/app/api/forms/[id]/route');
+    mockGetCurrentUser.mockResolvedValue(mockParentSession.user);
+
+    const form = mockDataFactory.permissionForm({ teacherId: mockTeacherSession.user.id });
+    mockPrismaClient.permissionForm.findUnique.mockResolvedValue(form);
+
+    const request = new NextRequest('http://localhost:6001/api/forms/form-123');
+    const response = await GET(request, { params: Promise.resolve({ id: 'form-123' }) });
+
+    expect(response.status).toBe(403);
+  });
 });
 
 describe('DELETE /api/forms/[id]', () => {
@@ -281,6 +294,88 @@ describe('DELETE /api/forms/[id]', () => {
       method: 'DELETE',
     });
     const response = await DELETE(request, { params: Promise.resolve({ id: 'form-123' }) });
+
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('GET /api/forms/[id]/export-csv', () => {
+  beforeEach(() => {
+    resetPrismaMocks();
+    vi.clearAllMocks();
+  });
+
+  const formWithSubmissions = {
+    ...mockDataFactory.permissionForm({ teacherId: mockTeacherSession.user.id }),
+    fields: [],
+    submissions: [
+      {
+        id: 'sub-1',
+        status: 'SIGNED' as const,
+        signedAt: new Date('2026-09-01T16:00:00.000Z'),
+        lastRemindedAt: null,
+        parent: { id: 'p1', name: 'Priya Chen', email: 'priya@example.com' },
+        student: { id: 's1', name: 'Ada Chen', grade: '4' },
+        responses: [],
+      },
+      {
+        id: 'sub-2',
+        status: 'PENDING' as const,
+        signedAt: null,
+        lastRemindedAt: null,
+        parent: { id: 'p2', name: 'Sam Ortiz', email: 'sam@example.com' },
+        student: { id: 's2', name: 'Ben Ortiz', grade: '4' },
+        responses: [],
+      },
+    ],
+  };
+
+  it('exports one row per student for trip roster view', async () => {
+    const { GET } = await import('@/app/api/forms/[id]/export-csv/route');
+    mockGetCurrentUser.mockResolvedValue(mockTeacherSession.user);
+    mockPrismaClient.permissionForm.findUnique.mockResolvedValue(formWithSubmissions);
+
+    const request = new NextRequest(
+      'http://localhost:6001/api/forms/form-123/export-csv?view=roster'
+    );
+    const response = await GET(request, { params: Promise.resolve({ id: 'form-123' }) });
+    const csv = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toContain('text/csv');
+    expect(response.headers.get('Content-Disposition')).toContain('trip-roster.csv');
+    expect(csv).toContain('Ada Chen');
+    expect(csv).toContain('Ben Ortiz');
+    expect(csv).toContain('Cleared');
+    expect(csv).toContain('Awaiting');
+  });
+
+  it('exports only cleared students for the bus list', async () => {
+    const { GET } = await import('@/app/api/forms/[id]/export-csv/route');
+    mockGetCurrentUser.mockResolvedValue(mockTeacherSession.user);
+    mockPrismaClient.permissionForm.findUnique.mockResolvedValue(formWithSubmissions);
+
+    const request = new NextRequest(
+      'http://localhost:6001/api/forms/form-123/export-csv?view=roster&status=cleared'
+    );
+    const response = await GET(request, { params: Promise.resolve({ id: 'form-123' }) });
+    const csv = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Disposition')).toContain('bus-list.csv');
+    expect(csv).toContain('Ada Chen');
+    expect(csv).not.toContain('Ben Ortiz');
+  });
+
+  it('returns 403 when a parent exports a roster', async () => {
+    const { GET } = await import('@/app/api/forms/[id]/export-csv/route');
+    mockGetCurrentUser.mockResolvedValue(mockParentSession.user);
+    mockPrismaClient.permissionForm.findUnique.mockResolvedValue(formWithSubmissions);
+
+    const request = new NextRequest(
+      'http://localhost:6001/api/forms/form-123/export-csv?view=roster'
+    );
+    const response = await GET(request, { params: Promise.resolve({ id: 'form-123' }) });
 
     expect(response.status).toBe(403);
   });

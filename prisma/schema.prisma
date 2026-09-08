@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin-arm64"]
 }
 
 datasource db {
@@ -23,6 +24,8 @@ model School {
   logoUrl   String?  @map("logo_url")
   primaryColor String? @map("primary_color")
   isActive  Boolean  @default(true) @map("is_active")
+  // Inclusive last day of the annual license. Null = legacy school, still allowed to send.
+  licensedThrough DateTime? @map("licensed_through")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -82,6 +85,7 @@ model User {
   invitesSent      Invite[]            @relation("InviteCreator")
   auditLogs        AuditLog[]
   reviewLogs       FormReviewLog[]
+  signLinks        FormSignLink[]      @relation("FormSignLinks")
 
   @@index([schoolId])
   @@index([schoolId, role])
@@ -203,6 +207,7 @@ model PermissionForm {
   documents   FormDocument[]
   shares      FormShare[]
   reviewLogs  FormReviewLog[]
+  signLinks   FormSignLink[]
 
   @@index([teacherId, status])
   @@index([schoolId])
@@ -249,11 +254,12 @@ model FormSubmission {
   formId        String           @map("form_id")
   parentId      String           @map("parent_id")
   studentId     String           @map("student_id")
-  signatureData String           @map("signature_data") @db.Text
-  signedAt      DateTime?        @map("signed_at")
-  ipAddress     String?          @map("ip_address")
-  pdfUrl        String?          @map("pdf_url")
-  status        SubmissionStatus @default(PENDING)
+  signatureData  String           @map("signature_data") @db.Text
+  signedAt       DateTime?        @map("signed_at")
+  ipAddress      String?          @map("ip_address")
+  pdfUrl         String?          @map("pdf_url")
+  status         SubmissionStatus @default(PENDING)
+  lastRemindedAt DateTime?        @map("last_reminded_at")
 
   // Relations
   form       PermissionForm  @relation(fields: [formId], references: [id], onDelete: Cascade)
@@ -335,6 +341,23 @@ model MagicLinkToken {
   @@index([token])
   @@index([email])
   @@map("magic_link_tokens")
+}
+
+// Capability token: parent signs from email without a login session
+model FormSignLink {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  formId    String   @map("form_id")
+  parentId  String   @map("parent_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  form   PermissionForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  parent User           @relation("FormSignLinks", fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, parentId])
+  @@index([parentId])
+  @@map("form_sign_links")
 }
 
 // External entity documents (e.g., field trip venue waivers, facility requirements)

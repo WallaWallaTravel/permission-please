@@ -19,12 +19,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get date ranges
+    if (user.role === 'ADMIN' && !user.schoolId) {
+      return NextResponse.json({ error: 'User must be assigned to a school' }, { status: 403 });
+    }
+
+    const schoolScope = user.role === 'SUPER_ADMIN' ? {} : { schoolId: user.schoolId };
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     // Get all counts in parallel
+    const formScope = schoolScope;
+    const submissionScope =
+      user.role === 'SUPER_ADMIN' ? {} : { form: { schoolId: user.schoolId } };
+    const schoolCountScope = user.role === 'SUPER_ADMIN' ? {} : { id: user.schoolId || '__none__' };
+
     const [
       totalSchools,
       activeSchools,
@@ -39,59 +48,39 @@ export async function GET(request: NextRequest) {
       formsOverTime,
       submissionsOverTime,
     ] = await Promise.all([
-      // Total schools
-      prisma.school.count(),
-
-      // Active schools
-      prisma.school.count({ where: { isActive: true } }),
-
-      // Total users
-      prisma.user.count(),
-
-      // Users by role
+      prisma.school.count({ where: schoolCountScope }),
+      prisma.school.count({ where: { isActive: true, ...schoolCountScope } }),
+      prisma.user.count({ where: formScope }),
       prisma.user.groupBy({
         by: ['role'],
+        where: formScope,
         _count: { id: true },
       }),
-
-      // Total forms
-      prisma.permissionForm.count(),
-
-      // Forms by status
+      prisma.permissionForm.count({ where: formScope }),
       prisma.permissionForm.groupBy({
         by: ['status'],
+        where: formScope,
         _count: { id: true },
       }),
-
-      // Total submissions
-      prisma.formSubmission.count(),
-
-      // Submissions by status
+      prisma.formSubmission.count({ where: submissionScope }),
       prisma.formSubmission.groupBy({
         by: ['status'],
+        where: submissionScope,
         _count: { id: true },
       }),
-
-      // Recent forms (last 7 days)
       prisma.permissionForm.count({
-        where: { createdAt: { gte: sevenDaysAgo } },
+        where: { createdAt: { gte: sevenDaysAgo }, ...formScope },
       }),
-
-      // Recent submissions (last 7 days)
       prisma.formSubmission.count({
-        where: { signedAt: { gte: sevenDaysAgo } },
+        where: { signedAt: { gte: sevenDaysAgo }, ...submissionScope },
       }),
-
-      // Forms created over last 30 days (grouped by day)
       prisma.permissionForm.findMany({
-        where: { createdAt: { gte: thirtyDaysAgo } },
+        where: { createdAt: { gte: thirtyDaysAgo }, ...formScope },
         select: { createdAt: true },
         orderBy: { createdAt: 'asc' },
       }),
-
-      // Submissions over last 30 days (grouped by day)
       prisma.formSubmission.findMany({
-        where: { signedAt: { gte: thirtyDaysAgo } },
+        where: { signedAt: { gte: thirtyDaysAgo }, ...submissionScope },
         select: { signedAt: true },
         orderBy: { signedAt: 'asc' },
       }),

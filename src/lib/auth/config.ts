@@ -53,9 +53,8 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, user, account }) {
-      // On initial sign in, get user data from database
-      if (account && user?.email) {
-        try {
+      try {
+        if (account && user?.email) {
           const dbUser = await prisma.user.findUnique({
             where: { email: user.email },
             select: { id: true, role: true, schoolId: true },
@@ -68,14 +67,31 @@ export const authOptions: NextAuthOptions = {
           } else {
             logger.warn('User not found in JWT callback', { email: user.email });
           }
-        } catch (error) {
-          logger.error(
-            'Database error in JWT callback',
-            error instanceof Error ? error : new Error('Unknown error'),
-            { email: user.email }
-          );
-          // Continue with token but without DB data - user can still authenticate
+          return token;
         }
+
+        if (token.id) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { id: true, role: true, schoolId: true },
+          });
+
+          if (!dbUser) {
+            const cleared = token as { id?: string; role?: string; schoolId?: string | null };
+            cleared.id = undefined;
+            cleared.role = undefined;
+            cleared.schoolId = undefined;
+          } else {
+            token.role = dbUser.role;
+            token.schoolId = dbUser.schoolId;
+          }
+        }
+      } catch (error) {
+        logger.error(
+          'Database error in JWT callback',
+          error instanceof Error ? error : new Error('Unknown error'),
+          { email: user?.email }
+        );
       }
 
       return token;

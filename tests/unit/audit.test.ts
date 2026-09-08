@@ -126,7 +126,7 @@ describe('Audit Logging', () => {
 
       const context = getRequestContext(mockRequest);
 
-      expect(context.ipAddress).toBe('192.168.1.1');
+      expect(context.ipAddress).toBe('192.168.xxx.xxx');
       expect(context.userAgent).toBe('Test Browser');
     });
 
@@ -157,6 +157,7 @@ describe('Audit Action Types', () => {
       'USER_LOGIN',
       'USER_LOGOUT',
       'DATA_EXPORT',
+      'DATA_DELETION_REQUEST',
     ];
 
     // This test documents the expected audit actions for FERPA compliance
